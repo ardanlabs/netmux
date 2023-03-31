@@ -1,0 +1,20 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+group setup conns
+user -> nx: install
+user -> nx: start
+user -> nx: connect <context>
+nx -> cluster : Port forwarding setup
+nx -> cluster : retrieve eps
+nx -> nx : Setup proxies
+end
+
+group fwd conns
+user -> local : connects via exposed ports
+local -> portforwading : connect
+portforwading -> nextmux: connect
+nextmux -> remote: connect
+end
+@enduml

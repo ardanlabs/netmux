@@ -1,0 +1,13 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  namespace: netmux
+  name: netmux
+spec:
+  serviceAccountName: netmux
+  containers:
+    - name: netmux
+      image: digitalcircle/netmux:arm64
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 8080

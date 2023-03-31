@@ -1,0 +1,91 @@
+#url: wss://netmux.dc.local:443/connect
+iface: lo0
+insecureSkipVerify: true
+contexts:
+  - name: test
+    url: ws://localhost:18081
+    enableportforward: true
+    runtime:
+      kubeconfig: ~/.kube/k8s.yaml # defaults to ~/.kube/config
+      kubecontext: default # defaults to defaul in kubeconfig
+      kubenamespace: netmux # defaults to netmux
+      kubeinstance: netmux # defaults to netmux - consider using a dedicated
+  - name: uw
+    enabled: true
+    url: tcp://localhost:18082
+    enableportforward: true
+    runtime:
+      kubeconfig: ~/.kube/config # defaults to ~/.kube/config
+      kubecontext: dev-gcp # defaults to defaul in kubeconfig
+      kubenamespace: data-infra # defaults to netmux
+      kubeinstance: netmux # defaults to netmux - consider using a dedicated
+
+
+#    services:
+#      - name: tcp://localhost:8082
+#        ep: tcp://:8084
+#        reverse: true
+#      - name: tcp://myself:8084
+#        ep: tcp://localhost:8084
+#        reverse: false
+#  - name: uw
+#    url: ws://localhost:18082
+#    key: nogGJZGwPrx5Vt0P1qCeJVls3IMP999MAdcxd0ZNuBrTg0RMEWul1aemHmCd677h
+#    enabled: true
+#    runtime:
+#      arch: amd64 # arm64, amd64
+#      kubeconfig: ~/.kube/config # defaults to ~/.kube/config
+#      kubecontext: dev-gcp # defaults to defaul in kubeconfig
+#      kubenamespace: data-infra # defaults to netmux
+#      kubeinstance: netmux # defaults to netmux - consider using a dedicated
+#    services:
+#      - name: tcp://kowl:8080
+#        ep: tcp://kowl.data-infra:8080
+#        localPort: 8080
+#      - name: tcp://kafka-0.broker.data-infra.svc.cluster.local:9092
+#        ep: tcp://kafka-0.broker.data-infra.svc.cluster.local:9092
+#        localPort: 9092
+#      - name: tcp://kafka-1.broker.data-infra.svc.cluster.local:9092
+#        ep: tcp://kafka-1.broker.data-infra.svc.cluster.local:9092
+#        localPort: 9092
+#      - name: tcp://kafka-2.broker.data-infra.svc.cluster.local:9092
+#        ep: tcp://kafka-2.broker.data-infra.svc.cluster.local:9092
+#        localPort: 9092
+#      - name: tcp://kafka-3.broker.data-infra.svc.cluster.local:9092
+#        ep: tcp://kafka-3.broker.data-infra.svc.cluster.local:9092
+#        localPort: 9092
+#      - name: tcp://kafka-4.broker.data-infra.svc.cluster.local:9092
+#        ep: tcp://kafka-4.broker.data-infra.svc.cluster.local:9092
+#        localPort: 9092
+#      - name: tcp://kafka:9092
+#        ep: tcp://kafka:9092
+#        localPort: 9092
+#      - name: tcp://api:50000
+#
+#  - name: ardan-service
+#    # Point this to where you have exposed the service
+#    # It may be a port forward or exposed by an Ingress
+#    url: ws://localhost:18081
+#    # If this is set as part of the deployment, it will be required here also
+#    # refer to: zarf/k8s/dev/netmux/kustomization.yaml, line 4
+#    key: Hi, I should be a secret!
+#    services:
+#      # The entry below will create a valid local DNS entry
+#      # that will proxy the in cluster DB implementation, allowin local dev
+#      # to connect to it without aditional stuff.
+#      - name: tcp://postgres-incluster:5432
+#        ep: tcp://database-service.sales-system:5432
+#      # This entry will allow pods in the cluster to connect to services
+#      # locally here.
+#      # The idea here is simple, you create a service in the cluster and point
+#      # it to any deployment of netmux.
+#      # From there you connect your agent, and the tunnel will be created,
+#      # Allowing remote cons to touch your local out-of-the-cluster services.
+#      # Please refer to zarf/k8s/dev/netmux/sample-outbound-service.yaml
+#      # as a sample service we created pointing to netmux
+#      # The deployed service should be capable of reaching that service
+#      # this network operability and name resolution should be observerd
+#      # in case troubleshooting is required.
+#      - name: tcp://postgres-outbound:5432
+#        ep: tcp://:5432
+#        reverse: true

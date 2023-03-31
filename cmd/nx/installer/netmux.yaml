@@ -1,0 +1,11 @@
+iface: lo0
+insecureSkipVerify: true
+contexts:
+  - name: default
+    url: ws://localhost:18081
+    enableportforward: true
+    runtime:
+      kubeconfig: ~/.kube/config # defaults to ~/.kube/config
+      kubecontext: ${CONTEXT} # defaults to defaul in kubeconfig
+      kubenamespace: ${NS} # defaults to netmux
+      kubeinstance: netmux # defaults to netmux - consider using a dedicated

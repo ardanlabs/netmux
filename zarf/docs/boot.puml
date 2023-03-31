@@ -1,0 +1,28 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+partition Config Load{
+    :Resolve Users;
+    :Resolve HomeDir;
+    :Resolve Config;
+    :Resolve k8s files to use;
+}
+
+partition Startup {
+    partition Load Context {
+        :Load Context Info;
+        if (is ctx autoinstall ?) then (true)
+            :Setup K8S Deploy;
+            :Setup K8S Service;
+        endif
+        :Establish Port Forward to Service;
+        :Create Services;
+        :Create Reverse Services;
+    }
+}
+:Monitor;
+:Shutdown;
+end
+
+@enduml

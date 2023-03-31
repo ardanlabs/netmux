@@ -1,0 +1,27 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+
+User -> User : Connection
+activate "Virtual Connection"
+User -> "Virtual Host": Connection
+
+"Virtual Host" -> "Virtual IP": Name Resolution
+"Virtual IP" -> "Service Proxy" : Connection
+"Service Proxy" -> "WS Connection" : Proxying
+"WS Connection" -> Netmux : Connection established
+Netmux -> "End Service" : TCP Connection
+
+User <-- "End Service" : Virtual Connection Established
+
+User <-> "End Service" : Data Exchange
+User ->  "Service Proxy": Close Connection
+"Service Proxy" ->  "WS Connection": Close Connection
+"WS Connection" -> Netmux: Close Connection
+Netmux -> "End Service": Close Connection
+User <-- "End Service": Connection closed
+
+deactivate "Virtual Connection"
+@enduml

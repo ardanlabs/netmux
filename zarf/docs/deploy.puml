@@ -1,0 +1,45 @@
+@startuml
+'https://plantuml.com/deployment-diagram
+
+frame Local{
+actor actor
+[NetmuxAgent]
+[LocalService]
+}
+frame K8S {
+    [NetmuxServer]
+    [Pods]
+}
+
+'actor/ "actor/"
+'agent agent
+'artifact artifact
+'boundary boundary
+'card card
+'circle circle
+'cloud cloud
+'collections collections
+'component component
+'control control
+'database database
+'entity entity
+'file file
+'folder folder
+'frame frame
+'interface interface
+'label label
+'node node
+'package package
+'queue queue
+'rectangle rectangle
+'stack stack
+'storage storage
+'usecase usecase
+'usecase/ "usecase/"
+actor -r(0)- NetmuxAgent
+NetmuxAgent -r(0)- NetmuxServer
+NetmuxAgent -d(0)- [LocalService]
+NetmuxServer -r(0)- Pods
+@enduml
+
+

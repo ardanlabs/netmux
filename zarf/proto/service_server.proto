@@ -1,0 +1,89 @@
+syntax = "proto3";
+option go_package = "lib/proto/server";
+package proxy;
+
+service NXProxy {
+  rpc Ver (Noop) returns (Noop) {}
+  rpc Proxy (stream ConnOut) returns (stream ConnIn) {}
+  rpc ReverseProxyListen (stream ConnOut) returns (stream RevProxyRequest) {}
+  rpc ReverseProxyWork (stream RevProxyConnIn) returns (stream RevProxyConnOut) {}
+  rpc Ping(StringMsg) returns(StringMsg){}
+  rpc PortScan(StringMsg) returns(StringMsg){}
+  rpc Nc(StringMsg) returns(StringMsg){}
+  rpc SpeedTest(StringMsg) returns(BytesMsg){}
+
+  rpc KeepAlive(Noop) returns(stream StringMsg){}
+
+  rpc GetConfigs(Noop) returns(Bridges){}
+
+  rpc Login(LoginReq) returns(StringMsg){}
+  rpc Logout(StringMsg) returns(Noop){}
+}
+
+message Bridge {
+  string name = 1;
+  string localaddr = 2;
+  string localport = 3;
+  string remoteaddr = 4;
+  string remoteport = 5;
+  string direction = 6;
+  string proto = 7;
+  bool auto = 8;
+  string k8snamespace = 9;
+  string k8sname = 10;
+  string k8skind = 11;
+  string bridgeop = 12;
+}
+
+message Bridges{
+  repeated Bridge eps = 1;
+}
+
+message Noop{
+  string msg = 1;
+  string err = 2;
+}
+
+message LoginReq{
+  string user = 1;
+  string pass = 2;
+}
+
+message StringMsg{
+  string msg = 1;
+}
+message BytesMsg{
+  bytes msg = 1;
+}
+
+message PingReq{
+  string ctx = 1;
+  string ep = 2;
+}
+
+message PortScanReq{
+  string ctx = 1;
+  string ep = 2;
+}
+
+message ConnOut {
+  optional Bridge bridge = 1;
+  bytes pl = 2;
+}
+message ConnIn {
+  bytes pl = 1;
+  string err = 2;
+}
+
+message RevProxyRequest {
+  string connId = 1;
+}
+
+message RevProxyConnIn {
+  string connId = 1;
+  bytes pl = 2;
+}
+message RevProxyConnOut {
+  bytes pl = 1;
+  string err = 2;
+}

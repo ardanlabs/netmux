@@ -1,0 +1,117 @@
+syntax = "proto3";
+option go_package = "lib/proto/agent";
+package agent;
+service Agent {
+  rpc SetConfig(StringMsg) returns(Noop){}
+  rpc GetConfig(Noop) returns(StringMsg){}
+
+  rpc Connect(StringMsg) returns (Noop){}
+  rpc Disconnect(StringMsg) returns (Noop){}
+  rpc PfOn(StringMsg) returns (Noop){}
+  rpc PfOff(StringMsg) returns (Noop){}
+  rpc StartSvc(SvcRequest) returns (Noop){}
+  rpc StopSvc(SvcRequest) returns (Noop){}
+  rpc ResetHosts(Noop) returns(Noop){}
+  rpc SpeedTest(StringMsg) returns (StringMsg){}
+
+  rpc Load(StringMsg) returns(Noop){}
+  rpc Exit(Noop) returns(Noop){}
+
+  rpc ClusterInstall(ClusterInstallReq) returns (Noop){}
+  rpc ClusterUninstall(StringMsg) returns (Noop){}
+
+  rpc Login(LoginMessage) returns(StringMsg){}
+  rpc Logout(StringMsg) returns(Noop){}
+
+  rpc Config(Noop) returns(BytesMsg){}
+  rpc Status(StringMsg) returns(StatusResponse){}
+  rpc Monitor(Noop) returns(stream StringMsg){}
+  rpc Events(Noop)  returns(stream EventMsg){}
+
+  rpc Ping(StringMsg) returns(StringMsg){}
+  rpc PortScan(StringMsg) returns(StringMsg){}
+  rpc Nc(StringMsg) returns(StringMsg){}
+}
+
+message Noop{
+}
+
+message BytesMsg{
+  bytes msg = 1;
+}
+
+message LoginMessage{
+  string username = 1;
+  string password = 2;
+  string context = 3;
+}
+
+message ClusterInstallReq{
+  string nxctx = 1;
+  string kctx = 2;
+  string ns = 3;
+  string arch = 4;
+}
+
+message EventMsg{
+  bytes msg = 1;
+  string ctx = 2;
+  string msgType = 3;
+}
+
+message StringMsg{
+  string msg = 1;
+  optional string ctx = 2;
+  optional string msgType = 3;
+}
+
+message SvcRequest{
+  string ctx = 1;
+  repeated string svcs = 2;
+}
+
+message ServiceStatusResponse{
+  string name = 1;
+  string localaddr = 2;
+  string localport = 3;
+  string remoteaddr = 4;
+  string remoteport = 5;
+  string proto = 6;
+  string auto = 7;
+  string status = 8;
+  string dir = 9;
+  int32 nconns = 10;
+  int64 sent = 11;
+  int64 recv = 12;
+}
+message ContextStatusResponse{
+  string name = 1;
+  string status = 2;
+  string portforward = 3;
+  string pfstatus = 4;
+  repeated ServiceStatusResponse services = 5;
+}
+message StatusResponse{
+  repeated ContextStatusResponse contexts = 1;
+  string Version = 2;
+  string Fname = 3;
+}
+
+message Ep {
+  string addr = 1 ;
+}
+
+message BytesPl {
+  string ep = 1;
+  bytes pl = 2;
+}
+
+message PingReq{
+  string ep = 1;
+}
+
+message PortScanReq{
+  string ep = 1;
+}
+
+

@@ -1,0 +1,36 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: netmux
+  namespace: netmux
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: netmux
+  template:
+    metadata:
+      labels:
+        app: netmux
+    spec:
+      volumes:
+        - name: passwd
+          secret:
+            secretName: netmux-passwords
+        - name: tokens
+          persistentVolumeClaim:
+            claimName: netmux-tokens
+      serviceAccountName: netmux
+
+      containers:
+        - name: netmux
+          image: digitalcircle/netmux:arm64
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - mountPath: /app/etc/passwd.yaml
+              subPath: passwd.yaml
+              name: passwd
+            - name: tokens
+              mountPath: /app/persistence

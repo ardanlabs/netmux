@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: netmux
+  name: remote1
+spec:
+  containers:
+    - name: remote
+      image: alpine:latest
+      command:
+        - sleep
+        - infinity
