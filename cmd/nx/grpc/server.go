@@ -1,25 +1,26 @@
+// Package grpc provides support for SOMETHING!!
 package grpc
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/natefinch/lumberjack"
-	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
-	"go.digitalcircle.com.br/dc/netmux/lib/events"
-	events2 "go.digitalcircle.com.br/dc/netmux/lib/events"
-	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
-	pbs "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
-	"google.golang.org/grpc"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"log"
 	"net"
 	"os"
 	"os/user"
 	"time"
+
+	"github.com/natefinch/lumberjack"
+	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/lib/config"
+	"go.digitalcircle.com.br/dc/netmux/lib/events"
+	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
+	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
+	pbs "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
+	"google.golang.org/grpc"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
 type server struct {
@@ -36,7 +37,6 @@ func (s server) Load(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 }
 
 func (s server) SetConfig(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
-	//service.Default().SourceFile = req.Msg
 	logrus.Infof("Loading config from: %s", req.Msg)
 	service.Reset()
 	config.Default().Fname = req.Msg
@@ -96,10 +96,10 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 		go func() {
 			for nErr < 5 {
 				<-t.C
-				events2.Send(&events.Event{
+				events.Send(&events.Event{
 					Type:    events.EventKATimeOut,
 					Ctx:     nxctx.Name,
-					Payload: fmt.Sprintf("Timeout for keepalive"),
+					Payload: "Timeout for keepalive",
 				})
 				nErr++
 			}
@@ -109,7 +109,7 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 			_, err = ka.Recv()
 			if err != nil {
 				nErr++
-				events2.Send(&events.Event{
+				events.Send(&events.Event{
 					Type:    events.EventTypeDisconnected,
 					Ctx:     nxctx.Name,
 					Payload: fmt.Sprintf("Disconnected: %s", err.Error()),

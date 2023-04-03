@@ -10,6 +10,6 @@ func TestLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	log.Printf(ret)
 
+	log.Print(ret)
 }

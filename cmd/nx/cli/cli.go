@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/user"
+	"strings"
+
 	"github.com/alecthomas/kong"
 	"github.com/hpcloud/tail"
 	"github.com/rodaine/table"
@@ -13,11 +17,8 @@ import (
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/cli/webview"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/installer"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/lib/argon2"
+	"go.digitalcircle.com.br/dc/netmux/foundation/argon2"
 	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
-	"os"
-	"os/user"
-	"strings"
 )
 
 func newClient() (agent.AgentClient, error) {
@@ -200,7 +201,7 @@ func Run() error {
 		return epList()
 
 	case "auth hash":
-		gen, err := argon2.GenerateFromPassword(opts.Pass)
+		gen, err := argon2.GenerateHash(opts.Pass)
 		if err != nil {
 			return err
 		}

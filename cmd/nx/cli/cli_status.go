@@ -3,12 +3,13 @@ package cli
 import (
 	"context"
 	"fmt"
-	"github.com/dustin/go-humanize"
-	"github.com/rodaine/table"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/dustin/go-humanize"
+	"github.com/rodaine/table"
+	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 func status() error {
@@ -26,6 +27,10 @@ func status() error {
 
 func statusOnce() error {
 	cli, err := newClient()
+	if err != nil {
+		return fmt.Errorf("newClient: %w", err)
+	}
+
 	var req = &pb.StringMsg{Msg: ""}
 	if opts.Status.Zero {
 		req = &pb.StringMsg{Msg: "zero"}
@@ -68,9 +73,6 @@ func statusOnce() error {
 
 	tbl.Print()
 	os.Stdout.WriteString("=====\n")
-	if opts.Status.Zero {
-
-	}
 
 	return nil
 }

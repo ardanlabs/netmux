@@ -2,10 +2,11 @@ package cli
 
 import (
 	"context"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 func configSet() error {
@@ -32,8 +33,7 @@ func configGet() error {
 		strings.Replace(fname, "~", actuser.HomeDir, 1)
 	}
 	var err error
-	fname, err = filepath.Abs(fname)
-	if err != nil {
+	if _, err = filepath.Abs(fname); err != nil {
 		return err
 	}
 	cli, err := newClient()

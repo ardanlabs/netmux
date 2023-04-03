@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-	"os"
 )
 
 func trace(s string, p ...interface{}) {
@@ -25,6 +26,7 @@ func (c *Config) Save() error {
 	}
 	return os.WriteFile(c.Src, bs, 0600)
 }
+
 func (c *Config) Load() error {
 	trace("Loading config")
 	src := c.Src
@@ -37,6 +39,7 @@ func (c *Config) Load() error {
 	c.Src = src
 	return err
 }
+
 func New() *Config {
 	ret := Config{
 		Src:    Fname,
