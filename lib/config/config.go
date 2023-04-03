@@ -40,7 +40,7 @@ func (c *Config) Load() error {
 	return err
 }
 
-func New() *Config {
+func New() (*Config, error) {
 	ret := Config{
 		Src:    Fname,
 		Fname:  "",
@@ -53,21 +53,28 @@ func New() *Config {
 			logrus.Infof("Using config from: %s", ret.Src)
 		} else {
 			ret.Src = "/app/persistence/netmux.yaml"
-			os.MkdirAll("/app/persistence", os.ModePerm)
+			err := os.MkdirAll("/app/persistence", os.ModePerm)
+			if err != nil {
+				return nil, err
+			}
 			logrus.Infof("Using config from: %s", ret.Src)
 		}
 
 	}
 
-	return &ret
+	return &ret, nil
 }
 
-var def = New()
+var def *Config
 
 func Default() *Config {
 	if def == nil {
-		def = New()
-		err := def.Load()
+		var err error
+		def, err = New()
+		if err != nil {
+			panic(err)
+		}
+		err = def.Load()
 		if err != nil {
 			panic(err)
 		}

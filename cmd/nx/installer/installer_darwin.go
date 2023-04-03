@@ -37,7 +37,7 @@ func AutoInstall(ctx string, ns string, arch string) error {
 	if arch == "" {
 		arch = runtime.GOARCH
 	}
-	err = Install(ctx, ns)
+	err = Install()
 	if err != nil {
 		return err
 	}
@@ -64,14 +64,13 @@ func AutoInstall(ctx string, ns string, arch string) error {
 	err = service.DefaultK8sController().SetupDeploy(
 		context.Background(),
 		nxctx,
-		ctx,
 		ns,
 		arch)
 
 	return err
 }
 
-func Install(ctx string, ns string) error {
+func Install() error {
 	execName, err := os.Executable()
 	if err != nil {
 		return err
@@ -205,12 +204,12 @@ func InstallTray() (string, error) {
 		return "", nil
 	}
 
-	user, err := user.Lookup(username)
+	aUser, err := user.Lookup(username)
 	if err != nil {
 		return "", err
 	}
 
-	err = os.WriteFile(fmt.Sprintf("%s/Library/LaunchAgents/nx.tray.plist", user.HomeDir), NxLocalPlist, 0600)
+	err = os.WriteFile(fmt.Sprintf("%s/Library/LaunchAgents/nx.tray.plist", aUser.HomeDir), NxLocalPlist, 0600)
 	if err != nil {
 		return "", err
 	}

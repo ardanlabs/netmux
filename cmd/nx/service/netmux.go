@@ -43,9 +43,14 @@ var ErrCouldNotReadConfig = fmt.Errorf("could not read config")
 
 var defaultCfg = new(Netmux)
 
-func Reset() {
-	defaultCfg.Stop()
+func Reset() error {
+	err := defaultCfg.Stop()
+	if err != nil {
+		return err
+	}
+
 	defaultCfg = new(Netmux)
+	return nil
 }
 
 func Default() *Netmux {

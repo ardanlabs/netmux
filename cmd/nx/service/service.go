@@ -76,13 +76,17 @@ func (s *Service) listen() error {
 		return nil
 	})
 	def := hosts.Default()
-	def.Add(s.IpAddr, []string{s.Bridge.LocalAddr}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
+	err = def.Add(s.IpAddr, []string{s.Bridge.LocalAddr}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
+	if err != nil {
+		return err
+	}
 
 	s.uuidHostname = TermHanlder.add(func() error {
 		s.uuidHostname = ""
-		def.RemoveByComment(fmt.Sprintf("ep:(%s)", s.Name()))
+		err := def.RemoveByComment(fmt.Sprintf("ep:(%s)", s.Name()))
 
 		if err != nil {
+			//not preventing termination on purpose
 			logrus.Warnf("error reseting alias: %v", err)
 		}
 		return nil
@@ -109,7 +113,10 @@ func (s *Service) listen() error {
 	go func() {
 		<-s.ctx.Done()
 		if s.Listener != nil {
-			s.Listener.Close()
+			err = s.Listener.Close()
+			if err != nil {
+				logrus.Warnf("Error closing listener: %s", err.Error())
+			}
 		}
 	}()
 
@@ -118,7 +125,12 @@ func (s *Service) listen() error {
 		if err != nil {
 			return err
 		}
-		go s.handleConnGrpc(c)
+		go func() {
+			err := s.handleConnGrpc(c)
+			if err != nil {
+				logrus.Warnf("Error in handleConnGrpc: %s", err.Error())
+			}
+		}()
 
 	}
 }
@@ -171,7 +183,7 @@ func (s *Service) Start() error {
 		}
 
 	default:
-		err = fmt.Errorf("Direction %s is unknown for service %s", s.Bridge.Direction, s.Name())
+		err = fmt.Errorf("direction %s is unknown for service %s", s.Bridge.Direction, s.Name())
 	}
 
 	return err
@@ -216,20 +228,17 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 	}
 	chErr := make(chan error)
 
-	//bridge := s.Bridge
-	//fout, _ := os.OpenFile(fmt.Sprintf("%s_%s_%v.out", bridge.RemoteAddr, bridge.RemotePort, time.Now().UnixMilli()), os.O_CREATE|os.O_RDWR, 0600)
-	//fin, _ := os.OpenFile(fmt.Sprintf("%s_%s_%v.in", bridge.RemoteAddr, bridge.RemotePort, time.Now().UnixMilli()), os.O_CREATE|os.O_RDWR, 0600)
-
-	//defer fout.Close()
-	//defer fin.Close()
-
 	go func() {
 		buf := make([]byte, 4096)
 		for {
 			n, err := c.Read(buf)
 			s.Sent = s.Sent + int64(n)
 			if err != nil {
-				c.Close()
+				errClose := c.Close()
+				if errClose != nil {
+					logrus.Warnf("Error closing connection: %s", err.Error())
+				}
+
 				chErr <- err
 				return
 			}
@@ -238,7 +247,10 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 				Pl: buf[:n],
 			})
 			if err != nil {
-				c.Close()
+				errClose := c.Close()
+				if errClose != nil {
+					logrus.Warnf("Error closing connection: %s", err.Error())
+				}
 				chErr <- err
 				return
 			}
@@ -249,7 +261,10 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 		for {
 			ci, err := proxyStream.Recv()
 			if err != nil {
-				c.Close()
+				errClose := c.Close()
+				if errClose != nil {
+					logrus.Warnf("Error closing connection: %s", err.Error())
+				}
 				chErr <- err
 				return
 			}
@@ -257,7 +272,10 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 
 			_, err = c.Write(ci.Pl)
 			if err != nil {
-				c.Close()
+				errClose := c.Close()
+				if errClose != nil {
+					logrus.Warnf("Error closing connection: %s", err.Error())
+				}
 				chErr <- err
 				return
 			}
@@ -348,7 +366,10 @@ func (s *Service) handleDataConnGrpc(id string) {
 		n, err := c.Read(buf)
 		if err != nil {
 			chErr <- err
-			c.Close()
+			errClose := c.Close()
+			if errClose != nil {
+				logrus.Warnf("Error closing connection: %s", err.Error())
+			}
 			return
 		}
 		err = rpw.Send(&pb.RevProxyConnIn{
@@ -357,7 +378,10 @@ func (s *Service) handleDataConnGrpc(id string) {
 		})
 		if err != nil {
 			chErr <- err
-			c.Close()
+			errClose := c.Close()
+			if errClose != nil {
+				logrus.Warnf("Error closing connection: %s", err.Error())
+			}
 			return
 		}
 	}()
@@ -366,13 +390,19 @@ func (s *Service) handleDataConnGrpc(id string) {
 		res, err := rpw.Recv()
 		if err != nil {
 			chErr <- err
-			c.Close()
+			errClose := c.Close()
+			if errClose != nil {
+				logrus.Warnf("Error closing connection: %s", err.Error())
+			}
 			return
 		}
 		_, err = c.Write(res.Pl)
 		if err != nil {
 			chErr <- err
-			c.Close()
+			errClose := c.Close()
+			if errClose != nil {
+				logrus.Warnf("Error closing connection: %s", err.Error())
+			}
 			return
 		}
 	}()

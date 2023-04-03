@@ -44,7 +44,7 @@ func configGet() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.WriteString(res.Msg)
+	printOut(res.Msg)
 	return err
 }
 
@@ -57,14 +57,13 @@ func configDump() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.Write(res.Msg)
+	printOut(string(res.Msg))
 	return nil
 }
 
 func hostsShow() error {
 	bs, _ := os.ReadFile("/etc/hosts")
-	os.Stdout.Write(bs)
-	os.Stdout.WriteString("\n")
+	printOut(string(bs))
 	return nil
 }
 

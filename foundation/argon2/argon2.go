@@ -1,4 +1,4 @@
-// package argon2 provides support for hasing passwords using the argon2 crypto
+// Package argon2 provides support for hasing passwords using the argon2 crypto
 // package for generating an IDKey.
 package argon2
 

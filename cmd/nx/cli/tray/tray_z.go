@@ -23,18 +23,22 @@ import (
 var logo []byte
 
 func newClient() (agent.AgentClient, error) {
-	return agent.NewUnixDefault("", "")
+	return agent.NewUnixDefault()
 }
 
-func wError(a fyne.App, err string) {
-	beeep.Alert("Netmux: Error", err, "")
+func wError(err string) {
+	errA := beeep.Alert("Netmux: Error", err, "")
+	if errA != nil {
+		logrus.Warnf("error on beep: %s", errA.Error())
+	}
 }
 
-func wMsg(a fyne.App, msg string) {
-	beeep.Alert("Netmux: Message", msg, "")
+func wMsg(msg string) {
+	errA := beeep.Alert("Netmux: Message", msg, "")
+	if errA != nil {
+		logrus.Warnf("error on beep: %s", errA.Error())
+	}
 }
-
-var winMain fyne.Window
 
 var cli agent.AgentClient
 
@@ -55,7 +59,7 @@ func Run(actuser *user.User) error {
 	a := app.New()
 
 	if err != nil {
-		wError(a, fmt.Sprintf("Error opening client: %s", err.Error()))
+		wError(fmt.Sprintf("Error opening client: %s", err.Error()))
 	}
 
 	go func() {
@@ -84,13 +88,13 @@ func Run(actuser *user.User) error {
 				}
 				switch evt.MsgType {
 				case events.EventTypeConnected:
-					wMsg(a, fmt.Sprintf("Connected to: %s", evt.Ctx))
+					wMsg(fmt.Sprintf("Connected to: %s", evt.Ctx))
 				case events.EventTypeDisconnected:
-					wMsg(a, fmt.Sprintf("Disconnected from: %s", evt.Ctx))
+					wMsg(fmt.Sprintf("Disconnected from: %s", evt.Ctx))
 				case events.EventKATimeOut:
 				}
 				if err != nil {
-					wError(a, fmt.Sprintf("Error receiving event: %s", err.Error()))
+					wError(fmt.Sprintf("Error receiving event: %s", err.Error()))
 					break
 				}
 			}
@@ -100,19 +104,19 @@ func Run(actuser *user.User) error {
 	cli, err := agCli()
 	if err != nil {
 		resetCli()
-		wError(a, err.Error())
+		wError(err.Error())
 		return err
 	}
 
 	_, err = cli.Load(context.Background(), &agent.StringMsg{Msg: filepath.Join(actuser.HomeDir, ".netmux.yaml")})
 
 	if err != nil {
-		wError(a, err.Error())
+		wError(err.Error())
 		return err
 	}
 
 	if desk, ok := a.(desktop.App); ok {
-		mis := []*fyne.MenuItem{}
+		var mis = make([]*fyne.MenuItem, 0)
 
 		mis = append(mis, fyne.NewMenuItem("Main Window", func() {
 			ex, _ := os.Executable()
@@ -121,7 +125,7 @@ func Run(actuser *user.User) error {
 			cmd.Stderr = os.Stderr
 			err = cmd.Start()
 			if err != nil {
-				wError(a, err.Error())
+				wError(err.Error())
 			}
 
 		}))
@@ -130,10 +134,14 @@ func Run(actuser *user.User) error {
 			cli, err := agCli()
 			if err != nil {
 				resetCli()
-				wError(a, err.Error())
+				wError(err.Error())
 				return
 			}
-			cli.Exit(context.Background(), &agent.Noop{})
+			_, err = cli.Exit(context.Background(), &agent.Noop{})
+			if err != nil {
+				logrus.Warnf("error calling exit: %s", err.Error())
+				return
+			}
 		}))
 
 		var menu *fyne.Menu

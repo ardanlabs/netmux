@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
-	"os"
 	"strings"
 )
 
@@ -46,7 +45,7 @@ func ctxPing() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.WriteString(res.Msg + "\n")
+	printOut(res.Msg + "\n")
 	return err
 }
 
@@ -59,7 +58,7 @@ func ctxPscan() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.WriteString(res.Msg + "\n")
+	printOut(res.Msg + "\n")
 	return err
 }
 
@@ -72,7 +71,7 @@ func ctxSpeedTest() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.WriteString(res.Msg + "\n")
+	printOut(res.Msg + "\n")
 	return err
 }
 
@@ -85,7 +84,7 @@ func ctxNc() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.WriteString(res.Msg + "\n")
+	printOut(res.Msg + "\n")
 	return err
 }
 

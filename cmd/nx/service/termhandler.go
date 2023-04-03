@@ -63,7 +63,7 @@ var ctx, cancel = context.WithCancel(context.Background())
 var TermHanlder = _termHandler{handlers: make(map[string]func() error), Ctx: ctx, Cancel: cancel}
 
 func init() {
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGKILL)
 	go func() {
 		<-ch

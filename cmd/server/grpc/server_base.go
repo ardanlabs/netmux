@@ -5,7 +5,7 @@ import (
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
-func (s *server) propagate(b *pb.Bridge) {
+func (s *ServerImpl) propagate(b *pb.Bridge) {
 	logrus.Infof("Actual data:")
 	s.eps.ForEach(func(k string, v *pb.Bridge) bool {
 		logrus.Infof("%s => %s", k, v.String())
@@ -15,7 +15,7 @@ func (s *server) propagate(b *pb.Bridge) {
 	s.chmux.Broadcast([]*pb.Bridge{b})
 }
 
-func (s *server) AddEp(b *pb.Bridge) {
+func (s *ServerImpl) AddEp(b *pb.Bridge) {
 	b.Bridgeop = "A"
 	existing := s.eps.Get(b.Name)
 	if existing != nil {
@@ -29,7 +29,7 @@ func (s *server) AddEp(b *pb.Bridge) {
 	s.eps.Set(b.Name, b)
 	s.propagate(b)
 }
-func (s *server) RemEp(b *pb.Bridge) {
+func (s *ServerImpl) RemEp(b *pb.Bridge) {
 	b.Bridgeop = "D"
 	existing := s.eps.Get(b.Name)
 	if existing != nil {
@@ -43,6 +43,6 @@ func (s *server) RemEp(b *pb.Bridge) {
 	s.propagate(b)
 }
 
-func Server() *server {
+func serverImpl() *ServerImpl {
 	return &aServer
 }

@@ -22,7 +22,7 @@ import (
 )
 
 func newClient() (agent.AgentClient, error) {
-	return agent.NewUnixDefault(opts.User, opts.Pass)
+	return agent.NewUnixDefault()
 }
 
 func start() error {
@@ -31,6 +31,10 @@ func start() error {
 
 func stop() error {
 	return nil
+}
+
+func printOut(s string, p ...any) {
+	_, _ = os.Stdout.WriteString(fmt.Sprintf(s+"\n", p...))
 }
 
 func exit() error {
@@ -104,85 +108,84 @@ func Run() error {
 
 	switch cliCtx.Command() {
 	case "exit":
-		exit()
+		err = exit()
 	case "server":
-		server()
+		err = server()
 
 	case "webview":
-		return webview.Run()
+		err = webview.Run()
 	case "status":
-		return status()
+		err = status()
 	case "tray install":
-		return trayInstall()
+		err = trayInstall()
 	case "tray uninstall":
-		return trayUninstall()
+		err = trayUninstall()
 	case "tray enable":
-		return trayEnable()
+		err = trayEnable()
 	case "tray disable":
-		return trayDisable()
+		err = trayDisable()
 	case "tray run":
-		return tray.Run(actuser)
+		err = tray.Run(actuser)
 	case "ctx install <ctx> <kctx> <ns> <arch>":
-		return ctxInstall()
+		err = ctxInstall()
 	case "ctx uninstall <ctx>":
-		return ctxUninstall()
+		err = ctxUninstall()
 	case "ctx login <ctx>":
-		return ctxLogin()
+		err = ctxLogin()
 	case "ctx logout <ctx>":
-		return ctxLogout()
+		err = ctxLogout()
 	case "ctx on <ctx>":
-		return ctxOn()
+		err = ctxOn()
 	case "ctx off <ctx>":
-		return ctxOff()
+		err = ctxOff()
 	case "ctx pfon <ctx>":
-		return ctxPfOn()
+		err = ctxPfOn()
 	case "ctx pfoff <ctx>":
-		return ctxPfOff()
+		err = ctxPfOff()
 	case "ctx reset <ctx>":
-		return ctxReset()
+		err = ctxReset()
 	case "ctx ping <ctx> <cmd>":
-		return ctxPing()
+		err = ctxPing()
 	case "ctx pscan <ctx> <cmd>":
-		return ctxPscan()
+		err = ctxPscan()
 	case "ctx speedtest <ctx> <pl>":
-		return ctxSpeedTest()
+		err = ctxSpeedTest()
 	case "ctx nc <ctx> <cmd>":
-		return ctxNc()
+		err = ctxNc()
 	case "svc on <ctx> <svc>":
-		return svcOn()
+		err = svcOn()
 	case "svc off <ctx> <svc>":
-		return svcOff()
+		err = svcOff()
 	case "svc reset <ctx> <svc>":
-		return svcReset()
+		err = svcReset()
 
 	case "config set <fname>":
-		return configSet()
+		err = configSet()
 	case "config dump":
-		return configDump()
+		err = configDump()
 	case "config get":
-		return configGet()
+		err = configGet()
 	case "config hosts show":
-		return hostsShow()
+		err = hostsShow()
 	case "config hosts reset":
-		return hostsReset()
+		err = hostsReset()
 
 	case "version":
 		logrus.Infof("%s: %s", service.Default().Semver, service.Default().Version)
-		return nil
 
 	case "monitor":
-		return monitorHandler()
+		err = monitorHandler()
 
 	case "logs":
 		t, err := tail.TailFile("/tmp/netmux.log", tail.Config{Follow: true})
 		if err != nil {
-			panic(err)
+			return err
 		}
 		for line := range t.Lines {
-			_, _ = os.Stdout.WriteString(line.Text + "\n")
+			printOut(line.Text)
 		}
 	case "agent install":
-		err := installer.Install(opts.Agent.Install.Ctx, opts.Agent.Install.Ns)
+		err := installer.Install()
 		if err != nil {
 			return err
 		}
@@ -198,7 +201,7 @@ func Run() error {
 		}
 
 	case "ep ls":
-		return epList()
+		err = epList()
 
 	case "auth hash":
 		gen, err := argon2.GenerateHash(opts.Pass)
@@ -207,7 +210,7 @@ func Run() error {
 		}
 		println(gen)
 	default:
-		return fmt.Errorf("unknown command: %s", cliCtx.Command())
+		err = fmt.Errorf("unknown command: %s", cliCtx.Command())
 	}
-	return nil
+	return err
 }

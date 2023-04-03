@@ -27,20 +27,8 @@ type server struct {
 	pb.UnsafeAgentServer
 }
 
-func (s server) Load(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) Load(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	_, err := os.Stat(req.Msg)
-	if err != nil {
-		return nil, err
-	}
-	service.Default().Load(req.Msg)
-	return &pb.Noop{}, nil
-}
-
-func (s server) SetConfig(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
-	logrus.Infof("Loading config from: %s", req.Msg)
-	service.Reset()
-	config.Default().Fname = req.Msg
-	err := config.Default().Save()
 	if err != nil {
 		return nil, err
 	}
@@ -48,13 +36,28 @@ func (s server) SetConfig(ctx context.Context, req *pb.StringMsg) (*pb.Noop, err
 	return &pb.Noop{}, err
 }
 
-func (s server) GetConfig(ctx context.Context, req *pb.Noop) (*pb.StringMsg, error) {
+func (s server) SetConfig(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+	logrus.Infof("Loading config from: %s", req.Msg)
+	err := service.Reset()
+	if err != nil {
+		return nil, err
+	}
+	config.Default().Fname = req.Msg
+	err = config.Default().Save()
+	if err != nil {
+		return nil, err
+	}
+	err = service.Default().Load(req.Msg)
+	return &pb.Noop{}, err
+}
+
+func (s server) GetConfig(_ context.Context, _ *pb.Noop) (*pb.StringMsg, error) {
 	res := &pb.StringMsg{Msg: config.Default().Fname}
 	return res, nil
 
 }
 
-func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) Connect(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 
 	if nxctx == nil {
@@ -131,36 +134,39 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 	return &pb.Noop{}, err
 }
 
-func (s server) Disconnect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) Disconnect(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
-	nxctx.Stop()
+	err := nxctx.Stop()
+	if err != nil {
+		return nil, err
+	}
 	nxctx.Services = make([]*service.Service, 0)
 
 	return &pb.Noop{}, nil
 }
 
-func (s server) ClusterInstall(ctx context.Context, req *pb.ClusterInstallReq) (*pb.Noop, error) {
+func (s server) ClusterInstall(_ context.Context, req *pb.ClusterInstallReq) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Nxctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
-	err := service.DefaultK8sController().SetupDeploy(ctx, nxctx, req.Ns, req.Kctx, req.Arch)
+	err := service.DefaultK8sController().SetupDeploy(context.Background(), nxctx, req.Ns, req.Arch)
 	return &pb.Noop{}, err
 }
 
-func (s server) ClusterUninstall(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) ClusterUninstall(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
-	err := service.DefaultK8sController().TearDownDeploy(ctx, nxctx)
+	err := service.DefaultK8sController().TearDownDeploy(context.Background(), nxctx)
 	return &pb.Noop{}, err
 }
 
-func (s server) PfOn(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) PfOn(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -172,7 +178,7 @@ func (s server) PfOn(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	return &pb.Noop{}, err
 }
 
-func (s server) PfOff(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) PfOff(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -184,7 +190,7 @@ func (s server) PfOff(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) 
 	return &pb.Noop{}, err
 }
 
-func (s server) Login(ctx context.Context, req *pb.LoginMessage) (*pb.StringMsg, error) {
+func (s server) Login(_ context.Context, req *pb.LoginMessage) (*pb.StringMsg, error) {
 
 	nxctx := service.Default().CtxByName(req.Context)
 	if nxctx == nil {
@@ -203,7 +209,7 @@ func (s server) Login(ctx context.Context, req *pb.LoginMessage) (*pb.StringMsg,
 	return &pb.StringMsg{Msg: "ok"}, nil
 }
 
-func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) Logout(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Msg)
@@ -221,12 +227,12 @@ func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error)
 	return &pb.Noop{}, nil
 }
 
-func (s server) ResetHosts(ctx context.Context, req *pb.Noop) (*pb.Noop, error) {
-	hosts.Default().RemoveByComment("nx: ctx")
-	return &pb.Noop{}, nil
+func (s server) ResetHosts(_ context.Context, _ *pb.Noop) (*pb.Noop, error) {
+	err := hosts.Default().RemoveByComment("nx: ctx")
+	return &pb.Noop{}, err
 }
 
-func (s server) StartSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
+func (s server) StartSvc(_ context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
@@ -251,7 +257,7 @@ func (s server) StartSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, err
 	return &pb.Noop{}, nil
 }
 
-func (s server) StopSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
+func (s server) StopSvc(_ context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
@@ -270,12 +276,12 @@ func (s server) StopSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, erro
 	return &pb.Noop{}, nil
 }
 
-func (s server) Exit(ctx context.Context, req *pb.Noop) (*pb.Noop, error) {
+func (s server) Exit(_ context.Context, _ *pb.Noop) (*pb.Noop, error) {
 	os.Exit(0)
 	return nil, nil
 }
 
-func (s server) Monitor(req *pb.Noop, res pb.Agent_MonitorServer) error {
+func (s server) Monitor(_ *pb.Noop, res pb.Agent_MonitorServer) error {
 	for {
 		bs, _ := json.Marshal(service.Default())
 		err := res.Send(&pb.StringMsg{Msg: string(bs)})
@@ -286,7 +292,7 @@ func (s server) Monitor(req *pb.Noop, res pb.Agent_MonitorServer) error {
 	}
 }
 
-func (s server) Events(req *pb.Noop, res pb.Agent_EventsServer) error {
+func (s server) Events(_ *pb.Noop, res pb.Agent_EventsServer) error {
 	l := events.NewListener()
 
 	defer func() {
@@ -295,11 +301,14 @@ func (s server) Events(req *pb.Noop, res pb.Agent_EventsServer) error {
 
 	for {
 		evt := <-l
-		res.Send(&pb.EventMsg{
+		err := res.Send(&pb.EventMsg{
 			Msg:     evt.PayloadJson(),
 			Ctx:     evt.Ctx,
-			MsgType: string(evt.Type),
+			MsgType: evt.Type,
 		})
+		if err != nil {
+			return err
+		}
 
 	}
 }
@@ -491,7 +500,10 @@ func Run(actuser *user.User) error {
 			_, err := os.Stat(config.Default().Fname)
 			if err == nil {
 				logrus.Infof("Loading config: %s", config.Default().Fname)
-				service.Default().Load(config.Default().Fname)
+				err := service.Default().Load(config.Default().Fname)
+				if err != nil {
+					return err
+				}
 
 				break
 			}

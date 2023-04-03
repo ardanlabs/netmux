@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -39,10 +38,10 @@ func statusOnce() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.WriteString("Measure Time: " + time.Now().String() + "\n")
-	os.Stdout.WriteString("Version: " + strings.Replace(res.Version, "\n", " ", 1) + "\n")
+	printOut("Measure Time: " + time.Now().String() + "\n")
+	printOut("Version: " + strings.Replace(res.Version, "\n", " ", 1) + "\n")
 
-	os.Stdout.WriteString("Config: " + res.Fname + "\n")
+	printOut("Config: " + res.Fname + "\n")
 
 	tbl := table.New("CTX", "SVC", "STATUS", "AUTO", "PROTO", "LADDR", "LPORT", "RADDR", "RPORT", "NCONNS", "SENT", "RECV")
 	for _, ctx := range res.Contexts {
@@ -72,7 +71,7 @@ func statusOnce() error {
 	}
 
 	tbl.Print()
-	os.Stdout.WriteString("=====\n")
+	printOut("=====\n")
 
 	return nil
 }

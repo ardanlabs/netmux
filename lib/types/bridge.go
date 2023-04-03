@@ -95,13 +95,13 @@ func (b *Bridge) ToPb(dst *pb.Bridge) {
 	dst.Auto = b.Auto
 }
 
-func (e *Bridge) LoadFromAnnotation(s string) error {
-	err := yaml.Unmarshal([]byte(s), e)
+func (b *Bridge) LoadFromAnnotation(s string) error {
+	err := yaml.Unmarshal([]byte(s), b)
 	if err != nil {
 		return err
 	}
-	if e.Name == "" {
-		e.Name = uuid.NewString()
+	if b.Name == "" {
+		b.Name = uuid.NewString()
 	}
 	return nil
 }

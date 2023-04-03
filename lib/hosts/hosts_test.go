@@ -20,6 +20,9 @@ func TestBasic(t *testing.T) {
 	if !a.Equals(b) {
 		t.Fatal("Should be equal")
 	}
-	b.RemoveByComment("hosts2")
+	err := b.RemoveByComment("hosts2")
+	if err != nil {
+		t.Fatal(err)
+	}
 	log.Print(string(b.Bytes()))
 }

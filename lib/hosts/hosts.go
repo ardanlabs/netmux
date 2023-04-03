@@ -10,13 +10,13 @@ import (
 	"sync"
 )
 
-type HostsEntry struct {
+type Entry struct {
 	Addr    string
 	Names   []string
 	Comment string
 }
 
-func (e *HostsEntry) Equals(f HostsEntry) bool {
+func (e *Entry) Equals(f Entry) bool {
 	if e.Addr != f.Addr {
 		return false
 	}
@@ -30,11 +30,11 @@ func (e *HostsEntry) Equals(f HostsEntry) bool {
 	}
 	return e.Comment == f.Comment
 }
-func (e *HostsEntry) String() string {
+func (e *Entry) String() string {
 	var hosts = strings.Join(e.Names, " ")
 	return fmt.Sprintf("%s %s %s", e.Addr, hosts, e.Comment)
 }
-func (e *HostsEntry) Load(s string) {
+func (e *Entry) Load(s string) {
 	parts := strings.Fields(s)
 	if len(parts) < 1 {
 		return
@@ -50,13 +50,13 @@ func (e *HostsEntry) Load(s string) {
 		e.Names = append(e.Names, parts[i])
 	}
 }
-func (e *HostsEntry) CommentMatches(s string) bool {
+func (e *Entry) CommentMatches(s string) bool {
 	return strings.Contains(e.Comment, s)
 }
 
 type Hosts struct {
 	fname   string
-	entries []HostsEntry
+	entries []Entry
 	mx      sync.Mutex
 }
 
@@ -66,7 +66,7 @@ func (m *Hosts) LoadBytes(bs []byte) {
 		if len(fileScanner.Text()) < 1 {
 			continue
 		}
-		var ae HostsEntry
+		var ae Entry
 		ae.Load(fileScanner.Text())
 		m.entries = append(m.entries, ae)
 	}
@@ -80,10 +80,10 @@ func (m *Hosts) Bytes() []byte {
 	}
 	return buf.Bytes()
 }
-func (m *Hosts) RemoveByComment(c string) {
+func (m *Hosts) RemoveByComment(c string) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
-	var ne []HostsEntry
+	var ne []Entry
 	for _, v := range m.entries {
 		if !v.CommentMatches(c) {
 			ne = append(ne, v)
@@ -92,7 +92,8 @@ func (m *Hosts) RemoveByComment(c string) {
 		}
 	}
 	m.entries = ne
-	m.unSyncSave()
+	return m.unSyncSave()
+
 }
 func (m *Hosts) Equals(n *Hosts) bool {
 	if len(m.entries) != len(n.entries) {
@@ -122,21 +123,21 @@ func (m *Hosts) unSyncSave() error {
 	//logrus.Debugf("Saving hosts to %s", m.fname)
 	err := os.WriteFile(m.fname, m.Bytes(), 0600)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	return nil
 }
-func (m *Hosts) Add(adr string, names []string, comment string) {
+func (m *Hosts) Add(adr string, names []string, comment string) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
-	e := HostsEntry{
+	e := Entry{
 		Addr:    adr,
 		Names:   names,
 		Comment: comment,
 	}
 	logrus.Debugf("Adding hosts entry: %s", e.String())
 	m.entries = append(m.entries, e)
-	m.unSyncSave()
+	return m.unSyncSave()
 }
 
 func New() *Hosts {
