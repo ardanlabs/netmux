@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+
 	"github.com/sirupsen/logrus"
-	cmd2 "go.digitalcircle.com.br/dc/netmux/lib/cmd"
+	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
-	"net"
 )
 
 type Service struct {
@@ -60,7 +61,7 @@ func (s *Service) listen() error {
 
 	logrus.Debugf("Listening service %s: %s", s.Name(), s.IpAddr)
 
-	err = cmd2.IfconfigAddAlias(Default().Iface, s.IpAddr)
+	err = shell.Ifconfig.AddAlias(Default().Iface, s.IpAddr)
 
 	if err != nil {
 		return err
@@ -68,7 +69,7 @@ func (s *Service) listen() error {
 
 	s.uuidIfconfig = TermHanlder.add(func() error {
 		s.uuidIfconfig = ""
-		err = cmd2.IfconfigRemAlias(Default().Iface, s.IpAddr)
+		err = shell.Ifconfig.RemoveAlias(Default().Iface, s.IpAddr)
 		if err != nil {
 			logrus.Warnf("error reseting alias: %v", err)
 		}

@@ -3,15 +3,16 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"os"
+	"strconv"
+
 	"github.com/sirupsen/logrus"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"net/url"
-	"os"
-	"strconv"
 )
 
 type Context struct {
@@ -119,7 +120,6 @@ func (c *Context) StopPortForwarding() error {
 }
 
 func (c *Context) onBridgeChange(ctx context.Context, bs *pb.Bridges) error {
-
 	for _, e := range bs.Eps {
 		e := e
 		switch e.Bridgeop {

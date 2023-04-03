@@ -5,10 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/lib/cmd"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
 	"io"
 	"os"
 	"os/user"
@@ -16,6 +12,11 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
+	"go.digitalcircle.com.br/dc/netmux/lib/config"
 )
 
 var VarContext = []byte("${CONTEXT}")
@@ -101,13 +102,13 @@ func Install(ctx string, ns string) error {
 	if err != nil {
 		return err
 	}
-	ret, err := cmd.LaunchCtlInstallDaemon()
+	ret, err := shell.Launchctl.InstallDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		return err
 	}
 	time.Sleep(time.Second * 10)
-	ret, err = cmd.LaunchCtlStartDaemon()
+	ret, err = shell.Launchctl.StartDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		logrus.Warnf(err.Error())
@@ -116,13 +117,13 @@ func Install(ctx string, ns string) error {
 }
 
 func Uninstall() error {
-	ret, err := cmd.LaunchCtlStopDaemon()
+	ret, err := shell.Launchctl.StopDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		logrus.Warnf(fmt.Errorf("error stopping daemon: %s, %s", ret, err).Error())
 	}
 
-	ret, err = cmd.LaunchCtlUnistallDaemon()
+	ret, err = shell.Launchctl.UnistallDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		logrus.Warnf(fmt.Errorf("error uninstalling daemon: %s, %s", ret, err).Error())
@@ -213,6 +214,6 @@ func InstallTray() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return cmd.LaunchCtlInstallTrayAgent()
+	return shell.Launchctl.InstallTrayAgent()
 	//cmd.LaunchCtlEnableTrayAgent()
 }

@@ -1,9 +1,10 @@
 package cli
 
 import (
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/installer"
-	"go.digitalcircle.com.br/dc/netmux/lib/cmd"
 	"os"
+
+	"go.digitalcircle.com.br/dc/netmux/cmd/nx/installer"
+	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 )
 
 func trayInstall() error {
@@ -11,18 +12,21 @@ func trayInstall() error {
 	os.Stdout.WriteString(ret)
 	return err
 }
+
 func trayUninstall() error {
-	ret, err := cmd.LaunchCtlUninstallTrayAgent()
+	ret, err := shell.Launchctl.UninstallTrayAgent()
 	os.Stdout.WriteString(ret)
 	return err
 }
+
 func trayEnable() error {
-	ret, err := cmd.LaunchCtlEnableTrayAgent()
+	ret, err := shell.Launchctl.EnableTrayAgent()
 	os.Stdout.WriteString(ret)
 	return err
 }
+
 func trayDisable() error {
-	ret, err := cmd.LaunchCtlDisableTrayAgent()
+	ret, err := shell.Launchctl.DisableTrayAgent()
 	os.Stdout.WriteString(ret)
 	return err
 }

@@ -2,38 +2,41 @@ package grpc
 
 import (
 	"context"
+
 	"github.com/dustin/go-humanize"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/lib/cmd"
+	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
-func (s server) Ping(_ context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
-	ret, err := cmd.Ping(req.Msg)
+func (server) Ping(_ context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
+	ret, err := shell.Ping(req.Msg)
 	if err != nil {
 		return nil, err
 	}
+
 	return &pb.StringMsg{Msg: ret}, nil
 }
 
-func (s server) PortScan(_ context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
-
-	ret, err := cmd.Nmap(req.Msg)
+func (server) PortScan(_ context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
+	ret, err := shell.Nmap(req.Msg)
 	if err != nil {
 		return nil, err
 	}
+
 	return &pb.StringMsg{Msg: ret}, nil
 }
 
-func (s server) Nc(_ context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
-	ret, err := cmd.Nc(req.Msg) //cmd.Nc(req.Msg)
+func (server) Nc(_ context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
+	ret, err := shell.Nc(req.Msg) //cmd.Nc(req.Msg)
 	if err != nil {
 		return nil, err
 	}
+
 	return &pb.StringMsg{Msg: ret}, nil
 }
 
-func (s server) SpeedTest(ctx context.Context, req *pb.StringMsg) (*pb.BytesMsg, error) {
+func (server) SpeedTest(ctx context.Context, req *pb.StringMsg) (*pb.BytesMsg, error) {
 	sz, err := humanize.ParseBytes(req.Msg)
 	if err != nil {
 		return nil, err

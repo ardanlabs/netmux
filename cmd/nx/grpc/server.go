@@ -231,6 +231,7 @@ func (s server) StartSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, err
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
 	}
+
 	for i := range req.Svcs {
 		svcn := req.Svcs[i]
 		svc := nxctx.SvcByName(svcn)
@@ -245,8 +246,8 @@ func (s server) StartSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, err
 			}
 		}()
 		time.Sleep(time.Second)
-
 	}
+
 	return &pb.Noop{}, nil
 }
 
