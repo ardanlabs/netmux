@@ -1,6 +1,6 @@
-// package argon2 provides support for hasing passwords using the argon2 crypto
+// package hash provides support for hasing passwords using the argon2 crypto
 // package for generating an IDKey.
-package argon2
+package hash
 
 import (
 	"crypto/rand"
@@ -17,6 +17,7 @@ import (
 var (
 	ErrInvalidHash         = errors.New("the encoded hash is not in the correct format")
 	ErrIncompatibleVersion = errors.New("incompatible version of argon2")
+	ErrInvalidMatch        = errors.New("the hash and value don't match")
 )
 
 const (
@@ -27,9 +28,8 @@ const (
 	parallelism = 2
 )
 
-// GenerateHash takes a string value and encodes that value into our own
-// unique format.
-func GenerateHash(value string) (string, error) {
+// New takes a string value and encodes that value into our own unique format.
+func New(value string) (string, error) {
 	salt, err := generateRandomBytes(saltLength)
 	if err != nil {
 		return "", fmt.Errorf("generateRandomBytes: %w", err)
@@ -45,23 +45,23 @@ func GenerateHash(value string) (string, error) {
 	return hash, nil
 }
 
-// DecodeAndCompare takes the value that was encoded and the hash that our
-// algorithm produced and validates the hash was derived from the value.
-func DecodeAndCompare(value string, hash string) (match bool, err error) {
-	salt, orgKey, err := decodeHash(hash)
+// Decode takes the hash that our algorithm produced for the specifiec value and
+// validates the hash was derived from the value.
+func Decode(hash string, value string) error {
+	salt, orgKey, err := decode(hash)
 	if err != nil {
-		return false, fmt.Errorf("decodeHash: %w", err)
+		return fmt.Errorf("decodeHash: %w", err)
 	}
 
 	newKey := argon2.IDKey([]byte(value), salt, iterations, memory, parallelism, keyLength)
 
 	// We are using the subtle.ConstantTimeCompare() function for this
 	// to help prevent timing attacks.
-	if subtle.ConstantTimeCompare(orgKey, newKey) == 1 {
-		return true, nil
+	if subtle.ConstantTimeCompare(orgKey, newKey) != 1 {
+		return ErrInvalidMatch
 	}
 
-	return false, nil
+	return nil
 }
 
 // =============================================================================
@@ -75,7 +75,7 @@ func generateRandomBytes(n uint32) ([]byte, error) {
 	return b, nil
 }
 
-func decodeHash(encodedHash string) (salt []byte, key []byte, err error) {
+func decode(encodedHash string) (salt []byte, key []byte, err error) {
 	vals := strings.Split(encodedHash, "$")
 	if len(vals) != 6 {
 		return nil, nil, ErrInvalidHash

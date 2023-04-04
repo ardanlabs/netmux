@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"go.digitalcircle.com.br/dc/netmux/foundation/argon2"
+	"go.digitalcircle.com.br/dc/netmux/foundation/hash"
 )
 
 func getPassHash() string {
@@ -25,7 +25,7 @@ func getPassHash() string {
 }
 
 func setPassword(s string) error {
-	hash, err := argon2.GenerateHash("nx")
+	hash, err := hash.New("nx")
 	if err != nil {
 		return fmt.Errorf("GenerateFromPassword: %w", err)
 	}

@@ -6,7 +6,7 @@ import (
 	_ "embed"
 	"time"
 
-	"go.digitalcircle.com.br/dc/netmux/foundation/argon2"
+	"go.digitalcircle.com.br/dc/netmux/foundation/hash"
 	"go.digitalcircle.com.br/dc/netmux/lib/config"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
@@ -20,11 +20,8 @@ func Login(user string, pass string) (string, error) {
 	}
 	for _, e := range pwd.Entries {
 		if e.User == user {
-			ok, err := argon2.DecodeAndCompare(pass, e.Hash)
+			err := hash.Decode(e.Hash, pass)
 			if err != nil {
-				return "", err
-			}
-			if !ok {
 				return "", ErrAuthError
 			}
 

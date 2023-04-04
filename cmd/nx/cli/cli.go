@@ -17,7 +17,7 @@ import (
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/cli/webview"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/installer"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/foundation/argon2"
+	"go.digitalcircle.com.br/dc/netmux/foundation/hash"
 	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
@@ -201,7 +201,7 @@ func Run() error {
 		return epList()
 
 	case "auth hash":
-		gen, err := argon2.GenerateHash(opts.Pass)
+		gen, err := hash.New(opts.Pass)
 		if err != nil {
 			return err
 		}
