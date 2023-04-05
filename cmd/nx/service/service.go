@@ -8,8 +8,8 @@ import (
 	"net"
 
 	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
 	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
-	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
 )
@@ -19,6 +19,8 @@ type Service struct {
 	Bridge *types.Bridge
 	ctx    context.Context
 	cancel func()
+	hosts  *hosts.Hosts
+
 	// Transient info
 
 	Sent         int64        `yaml:"-"`
@@ -75,12 +77,11 @@ func (s *Service) listen() error {
 		}
 		return nil
 	})
-	def := hosts.Default()
-	def.Add(s.IpAddr, []string{s.Bridge.LocalAddr}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
+	s.hosts.Add(s.IpAddr, []string{s.Bridge.LocalAddr}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
 
 	s.uuidHostname = TermHanlder.add(func() error {
 		s.uuidHostname = ""
-		def.RemoveByComment(fmt.Sprintf("ep:(%s)", s.Name()))
+		s.hosts.Remove(fmt.Sprintf("ep:(%s)", s.Name()))
 
 		if err != nil {
 			logrus.Warnf("error reseting alias: %v", err)
@@ -171,7 +172,7 @@ func (s *Service) Start() error {
 		}
 
 	default:
-		err = fmt.Errorf("Direction %s is unknown for service %s", s.Bridge.Direction, s.Name())
+		err = fmt.Errorf("direction %s is unknown for service %s", s.Bridge.Direction, s.Name())
 	}
 
 	return err
@@ -266,14 +267,13 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 
 	s.NConns++
 	s.parent.NConns++
-	rawErr := <-chErr
+	<-chErr
 	s.NConns--
 	s.parent.NConns--
 
 	logrus.Infof("Closing con %s => %s", s.Name(), s.Bridge.String())
 
 	if err != nil {
-		err = rawErr.(error)
 		logrus.Warnf("error client conn: %v", err)
 	}
 

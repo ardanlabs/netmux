@@ -98,6 +98,9 @@ func (c *Netmux) Prepare(loggedUserName string, s string) error {
 	if actUser.Username == "root" {
 
 		runningUser, err = user.Lookup(os.Getenv("SUDO_USER"))
+		if err != nil {
+			return err
+		}
 
 		if runningUser == nil {
 
@@ -163,6 +166,9 @@ func (c *Netmux) Prepare(loggedUserName string, s string) error {
 	c.Username = runningUser.Username
 	c.Userhome = runningUser.HomeDir
 	c.Hostname, err = os.Hostname()
+	if err != nil {
+		return err
+	}
 	c.HostOS = runtime.GOOS
 	c.HostArch = runtime.GOARCH
 	c.WorkingDir = wd

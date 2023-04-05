@@ -3,17 +3,19 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"time"
+
+	"os"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
 )
 
 type K8SController struct {
@@ -630,12 +632,12 @@ func (k *K8SController) TearDownDeploy(ctx context.Context, nmxctx *Context) err
 
 	kubeConfig, err := clientcmd.BuildConfigFromFlags("", rt.Kubeconfig)
 	if err != nil {
-		return fmt.Errorf("error getting Kubernetes config: %v\n", err)
+		return fmt.Errorf("error getting Kubernetes config: %w", err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("error getting Kubernetes clientset: %v\n", err)
+		return fmt.Errorf("error getting Kubernetes clientset: %w", err)
 	}
 
 	err = clientset.CoreV1().Namespaces().Delete(ctx, NetmuxName, v1.DeleteOptions{})

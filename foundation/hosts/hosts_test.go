@@ -13,13 +13,16 @@ func TestBasic(t *testing.T) {
 `
 	var a = New()
 	var b = New()
-	a.LoadBytes([]byte(str))
+
+	a.addEntries([]byte(str))
 	log.Printf("%#v", a.entries)
-	log.Print(string(a.Bytes()))
-	b.LoadBytes(a.Bytes())
+	log.Print(string(a.bytes()))
+
+	b.addEntries(a.bytes())
 	if !a.Equals(b) {
 		t.Fatal("Should be equal")
 	}
-	b.RemoveByComment("hosts2")
-	log.Print(string(b.Bytes()))
+
+	b.Remove("hosts2")
+	log.Print(string(b.bytes()))
 }

@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type _termHandler struct {
@@ -64,7 +65,7 @@ var TermHanlder = _termHandler{handlers: make(map[string]func() error), Ctx: ctx
 
 func init() {
 	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(ch, syscall.SIGTERM, syscall.SIGTERM)
 	go func() {
 		<-ch
 		TermHanlder.terminate()

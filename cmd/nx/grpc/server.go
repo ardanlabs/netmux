@@ -15,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
 	"go.digitalcircle.com.br/dc/netmux/foundation/config"
+	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
 	"go.digitalcircle.com.br/dc/netmux/foundation/signal"
-	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 	pbs "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"google.golang.org/grpc"
@@ -45,9 +45,10 @@ func (e *event) PayloadJson() []byte {
 type server struct {
 	pb.UnsafeAgentServer
 	signal *signal.Signal[event]
+	hosts  *hosts.Hosts
 }
 
-func (s server) Load(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) Load(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	_, err := os.Stat(req.Msg)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func (s server) Load(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	return &pb.Noop{}, nil
 }
 
-func (s server) SetConfig(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) SetConfig(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	logrus.Infof("Loading config from: %s", req.Msg)
 	service.Reset()
 
@@ -76,7 +77,7 @@ func (s server) SetConfig(ctx context.Context, req *pb.StringMsg) (*pb.Noop, err
 	return &pb.Noop{}, err
 }
 
-func (s server) GetConfig(ctx context.Context, req *pb.Noop) (*pb.StringMsg, error) {
+func (s *server) GetConfig(ctx context.Context, req *pb.Noop) (*pb.StringMsg, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, err
@@ -87,7 +88,7 @@ func (s server) GetConfig(ctx context.Context, req *pb.Noop) (*pb.StringMsg, err
 	return res, nil
 }
 
-func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 
 	if nxctx == nil {
@@ -169,7 +170,7 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 	return &pb.Noop{}, err
 }
 
-func (s server) Disconnect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) Disconnect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -180,7 +181,7 @@ func (s server) Disconnect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, er
 	return &pb.Noop{}, nil
 }
 
-func (s server) ClusterInstall(ctx context.Context, req *pb.ClusterInstallReq) (*pb.Noop, error) {
+func (s *server) ClusterInstall(ctx context.Context, req *pb.ClusterInstallReq) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Nxctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -189,7 +190,7 @@ func (s server) ClusterInstall(ctx context.Context, req *pb.ClusterInstallReq) (
 	return &pb.Noop{}, err
 }
 
-func (s server) ClusterUninstall(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) ClusterUninstall(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -198,7 +199,7 @@ func (s server) ClusterUninstall(ctx context.Context, req *pb.StringMsg) (*pb.No
 	return &pb.Noop{}, err
 }
 
-func (s server) PfOn(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) PfOn(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -210,7 +211,7 @@ func (s server) PfOn(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	return &pb.Noop{}, err
 }
 
-func (s server) PfOff(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) PfOff(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -222,7 +223,7 @@ func (s server) PfOff(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) 
 	return &pb.Noop{}, err
 }
 
-func (s server) Login(ctx context.Context, req *pb.LoginMessage) (*pb.StringMsg, error) {
+func (s *server) Login(ctx context.Context, req *pb.LoginMessage) (*pb.StringMsg, error) {
 	nxctx := service.Default().CtxByName(req.Context)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Context)
@@ -246,7 +247,7 @@ func (s server) Login(ctx context.Context, req *pb.LoginMessage) (*pb.StringMsg,
 	return &pb.StringMsg{Msg: "ok"}, nil
 }
 
-func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s *server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Msg)
@@ -269,12 +270,12 @@ func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error)
 	return &pb.Noop{}, nil
 }
 
-func (s server) ResetHosts(ctx context.Context, req *pb.Noop) (*pb.Noop, error) {
-	hosts.Default().RemoveByComment("nx: ctx")
+func (s *server) ResetHosts(ctx context.Context, req *pb.Noop) (*pb.Noop, error) {
+	s.hosts.Remove("nx: ctx")
 	return &pb.Noop{}, nil
 }
 
-func (s server) StartSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
+func (s *server) StartSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
@@ -299,7 +300,7 @@ func (s server) StartSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, err
 	return &pb.Noop{}, nil
 }
 
-func (s server) StopSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
+func (s *server) StopSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
@@ -318,12 +319,12 @@ func (s server) StopSvc(ctx context.Context, req *pb.SvcRequest) (*pb.Noop, erro
 	return &pb.Noop{}, nil
 }
 
-func (s server) Exit(ctx context.Context, req *pb.Noop) (*pb.Noop, error) {
+func (s *server) Exit(ctx context.Context, req *pb.Noop) (*pb.Noop, error) {
 	os.Exit(0)
 	return nil, nil
 }
 
-func (s server) Monitor(req *pb.Noop, res pb.Agent_MonitorServer) error {
+func (s *server) Monitor(req *pb.Noop, res pb.Agent_MonitorServer) error {
 	for {
 		bs, _ := json.Marshal(service.Default())
 		err := res.Send(&pb.StringMsg{Msg: string(bs)})
@@ -334,7 +335,7 @@ func (s server) Monitor(req *pb.Noop, res pb.Agent_MonitorServer) error {
 	}
 }
 
-func (s server) Events(req *pb.Noop, res pb.Agent_EventsServer) error {
+func (s *server) Events(req *pb.Noop, res pb.Agent_EventsServer) error {
 	chn := s.signal.Aquire()
 
 	for {
@@ -400,7 +401,7 @@ func buildStatus(resetCounters bool) (*pb.StatusResponse, error) {
 	return &ret, nil
 }
 
-func (s server) Status(_ context.Context, req *pb.StringMsg) (*pb.StatusResponse, error) {
+func (s *server) Status(_ context.Context, req *pb.StringMsg) (*pb.StatusResponse, error) {
 	res, err := buildStatus(req.Msg == "zero")
 	if err != nil {
 		return nil, err
@@ -409,7 +410,7 @@ func (s server) Status(_ context.Context, req *pb.StringMsg) (*pb.StatusResponse
 	return res, nil
 
 }
-func (s server) Ping(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
+func (s *server) Ping(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
@@ -433,7 +434,7 @@ func (s server) Ping(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, err
 
 	return &pb.StringMsg{Msg: res.Msg}, nil
 }
-func (s server) PortScan(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
+func (s *server) PortScan(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
@@ -457,7 +458,7 @@ func (s server) PortScan(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg,
 
 	return &pb.StringMsg{Msg: res.Msg}, nil
 }
-func (s server) SpeedTest(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
+func (s *server) SpeedTest(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 
 	if nxctx == nil {
@@ -483,7 +484,7 @@ func (s server) SpeedTest(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg
 		len(res.Msg),
 	)}, nil
 }
-func (s server) Config(context.Context, *pb.Noop) (*pb.BytesMsg, error) {
+func (s *server) Config(context.Context, *pb.Noop) (*pb.BytesMsg, error) {
 	bs, err := json.Marshal(service.Default())
 	if err != nil {
 		return nil, err
@@ -492,7 +493,7 @@ func (s server) Config(context.Context, *pb.Noop) (*pb.BytesMsg, error) {
 	return ret, nil
 }
 
-func (s server) Nc(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
+func (s *server) Nc(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
@@ -579,11 +580,12 @@ func Run(actuser *user.User) error {
 
 	srv := server{
 		signal: signal.New[event](),
+		hosts:  hosts.New(),
 	}
 	defer srv.signal.Shutdown()
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterAgentServer(grpcServer, srv)
+	pb.RegisterAgentServer(grpcServer, &srv)
 
 	return grpcServer.Serve(l)
 }

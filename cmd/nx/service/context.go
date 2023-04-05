@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
 	corev1 "k8s.io/api/core/v1"
@@ -141,6 +142,7 @@ func (c *Context) onBridgeChange(ctx context.Context, bs *pb.Bridges) error {
 			svc = &Service{
 				parent: c,
 				Bridge: b,
+				hosts:  hosts.New(),
 			}
 
 			svc.ctx, svc.cancel = context.WithCancel(c.ctx)
