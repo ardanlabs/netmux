@@ -15,7 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
 	"go.digitalcircle.com.br/dc/netmux/foundation/config"
-	"go.digitalcircle.com.br/dc/netmux/lib/events"
+	"go.digitalcircle.com.br/dc/netmux/foundation/signal"
 	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 	pbs "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
@@ -23,8 +23,28 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
+const (
+	eventTypeDisconnected = "disconnected"
+	eventTypeConnected    = "connected"
+	eventKATimeOut        = "katimeout"
+)
+
+type event struct {
+	Type    string
+	Ctx     string
+	Payload any
+}
+
+func (e *event) PayloadJson() []byte {
+	bs, _ := json.Marshal(e.Payload)
+	return bs
+}
+
+// =============================================================================
+
 type server struct {
 	pb.UnsafeAgentServer
+	signal *signal.Signal[event]
 }
 
 func (s server) Load(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
@@ -114,8 +134,8 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 		go func() {
 			for nErr < 5 {
 				<-t.C
-				events.Send(&events.Event{
-					Type:    events.EventKATimeOut,
+				s.signal.Broadcast(event{
+					Type:    eventKATimeOut,
 					Ctx:     nxctx.Name,
 					Payload: "Timeout for keepalive",
 				})
@@ -127,8 +147,8 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 			_, err = ka.Recv()
 			if err != nil {
 				nErr++
-				events.Send(&events.Event{
-					Type:    events.EventTypeDisconnected,
+				s.signal.Broadcast(event{
+					Type:    eventTypeDisconnected,
 					Ctx:     nxctx.Name,
 					Payload: fmt.Sprintf("Disconnected: %s", err.Error()),
 				})
@@ -140,8 +160,8 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 		}
 	}()
 
-	events.Send(&events.Event{
-		Type:    events.EventTypeConnected,
+	s.signal.Broadcast(event{
+		Type:    eventTypeConnected,
 		Ctx:     req.Msg,
 		Payload: "connected at: " + time.Now().String(),
 	})
@@ -315,20 +335,19 @@ func (s server) Monitor(req *pb.Noop, res pb.Agent_MonitorServer) error {
 }
 
 func (s server) Events(req *pb.Noop, res pb.Agent_EventsServer) error {
-	l := events.NewListener()
-
-	defer func() {
-		events.Close(l)
-	}()
+	chn := s.signal.Aquire()
 
 	for {
-		evt := <-l
+		evt, ok := <-chn
+		if !ok {
+			return nil
+		}
+
 		res.Send(&pb.EventMsg{
 			Msg:     evt.PayloadJson(),
 			Ctx:     evt.Ctx,
 			MsgType: string(evt.Type),
 		})
-
 	}
 }
 
@@ -558,7 +577,13 @@ func Run(actuser *user.User) error {
 		return err
 	}
 
+	srv := server{
+		signal: signal.New[event](),
+	}
+	defer srv.signal.Shutdown()
+
 	grpcServer := grpc.NewServer()
-	pb.RegisterAgentServer(grpcServer, server{})
+	pb.RegisterAgentServer(grpcServer, srv)
+
 	return grpcServer.Serve(l)
 }

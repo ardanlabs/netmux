@@ -5,19 +5,27 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/driver/desktop"
-	"github.com/gen2brain/beeep"
-	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/lib/events"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"time"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/driver/desktop"
+	"github.com/gen2brain/beeep"
+	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
+
+const (
+	eventTypeDisconnected = "disconnected"
+	eventTypeConnected    = "connected"
+	eventKATimeOut        = "katimeout"
+)
+
+// =============================================================================
 
 //go:embed duck-w.png
 var logo []byte
@@ -83,11 +91,11 @@ func Run(actuser *user.User) error {
 					break
 				}
 				switch evt.MsgType {
-				case events.EventTypeConnected:
+				case eventTypeConnected:
 					wMsg(a, fmt.Sprintf("Connected to: %s", evt.Ctx))
-				case events.EventTypeDisconnected:
+				case eventTypeDisconnected:
 					wMsg(a, fmt.Sprintf("Disconnected from: %s", evt.Ctx))
-				case events.EventKATimeOut:
+				case eventKATimeOut:
 				}
 				if err != nil {
 					wError(a, fmt.Sprintf("Error receiving event: %s", err.Error()))
@@ -136,9 +144,7 @@ func Run(actuser *user.User) error {
 			cli.Exit(context.Background(), &agent.Noop{})
 		}))
 
-		var menu *fyne.Menu
-
-		menu = fyne.NewMenu("Netmux", mis...)
+		menu := fyne.NewMenu("Netmux", mis...)
 
 		desk.SetSystemTrayMenu(menu)
 
