@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/server/auth"
 	"go.digitalcircle.com.br/dc/netmux/foundation/db"
-	"go.digitalcircle.com.br/dc/netmux/lib/chmux"
+	"go.digitalcircle.com.br/dc/netmux/foundation/signal"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"google.golang.org/grpc"
 )
@@ -18,7 +18,7 @@ type server struct {
 	eps      *db.DB[*pb.Bridge]
 	sessions *db.DB[string]
 	conns    *db.DB[net.Conn]
-	chmux    *chmux.ChMux[[]*pb.Bridge]
+	signal   *signal.Signal[*pb.Bridge]
 }
 
 func (s server) mustEmbedUnimplementedServerServiceServer() {
@@ -48,41 +48,34 @@ func (s server) GetConfigs(ctx context.Context, req *pb.Noop) (*pb.Bridges, erro
 }
 
 func (s server) StreamConfig(req *pb.Noop, server pb.NXProxy_StreamConfigServer) error {
-	ret := &pb.Bridges{Eps: s.eps.KeyValues().Values()}
-	err := server.Send(ret)
-	if err != nil {
+	brds := pb.Bridges{
+		Eps: s.eps.KeyValues().Values(),
+	}
+
+	if err := server.Send(&brds); err != nil {
 		logrus.Warnf("Error sending initial cfg: %s", err.Error())
 		return err
 	}
-	ch := s.chmux.New()
-
-	logrus.Tracef("added cfg listener for local agent")
-	go func() {
-		<-server.Context().Done()
-		logrus.Tracef("closing get config due to ctx cancellation")
-		if ch != nil {
-			s.chmux.Close(ch)
-			ch = nil
-		}
-	}()
 
 	defer func() {
-		logrus.Tracef("closing cfg listener for local agent")
-		if ch != nil {
-			s.chmux.Close(ch)
-		}
+		logrus.Tracef("shutting down signal system")
+		s.signal.Shutdown()
 	}()
+
+	ch := s.signal.Aquire()
+	logrus.Tracef("added cfg listener for local agent")
 
 	for {
 		logrus.Tracef("awaiting cfg")
-		b, ok := <-ch
+
+		eps := <-ch
 		logrus.Tracef("got cfg")
-		if !ok {
-			return nil
+
+		brds := pb.Bridges{
+			Eps: []*pb.Bridge{eps},
 		}
-		ret := &pb.Bridges{Eps: b}
-		err = server.Send(ret)
-		if err != nil {
+
+		if err := server.Send(&brds); err != nil {
 			return err
 		}
 	}
@@ -99,7 +92,7 @@ var aServer = server{
 	eps:      db.New[*pb.Bridge](db.NopReadWriter{}),
 	sessions: db.New[string](db.NopReadWriter{}),
 	conns:    db.New[net.Conn](db.NopReadWriter{}),
-	chmux:    chmux.New[[]*pb.Bridge](),
+	signal:   signal.New[*pb.Bridge](),
 }
 
 func Run() error {

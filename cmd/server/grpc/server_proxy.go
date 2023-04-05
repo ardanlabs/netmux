@@ -9,7 +9,6 @@ import (
 )
 
 func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
-
 	co, err := connectServer.Recv()
 	if err != nil {
 		return err
@@ -30,7 +29,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 	}
 	c, err := bridge.DialRemote()
 	if err != nil {
-		err = fmt.Errorf("Could not make proxy ep connection to %s", bridge.String(), err.Error())
+		err = fmt.Errorf("could not make proxy ep connection to %s: %w", bridge.String(), err)
 		logrus.Warnf(err.Error())
 		return err
 	}
@@ -42,7 +41,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 		for {
 			co, err := connectServer.Recv()
 			if err != nil {
-				chErr <- fmt.Errorf("Error receiving data from local %s: %s", bridge.Name, err.Error())
+				chErr <- fmt.Errorf("error receiving data from local %s: %w", bridge.Name, err)
 				c.Close()
 				chErr <- err
 				return
@@ -51,7 +50,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 				_, err = c.Write(co.Pl)
 				if err != nil {
 					c.Close()
-					chErr <- fmt.Errorf("Error sending data from proxy %s: %s", bridge.Name, err.Error())
+					chErr <- fmt.Errorf("error sending data from proxy %s: %w", bridge.Name, err)
 					return
 				}
 			}
@@ -63,7 +62,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 		for {
 			n, err := c.Read(buf)
 			if err != nil {
-				chErr <- fmt.Errorf("Error receiving data from proxy %s: %s", bridge.Name, err.Error())
+				chErr <- fmt.Errorf("error receiving data from proxy %s: %s", bridge.Name, err.Error())
 				c.Close()
 				chErr <- err
 				return
@@ -74,7 +73,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 				Err: "",
 			})
 			if err != nil {
-				chErr <- fmt.Errorf("Error sending data to local %s: %s", bridge.Name, err.Error())
+				chErr <- fmt.Errorf("error sending data to local %s: %w", bridge.Name, err)
 				c.Close()
 
 				chErr <- err

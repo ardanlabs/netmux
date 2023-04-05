@@ -5,14 +5,16 @@ import (
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
-func (s *server) propagate(b *pb.Bridge) {
+func (s *server) propagate(brd *pb.Bridge) {
 	logrus.Infof("Actual data:")
-	s.eps.ForEach(func(k string, v *pb.Bridge) error {
-		logrus.Infof("%s => %s", k, v.String())
+
+	s.eps.ForEach(func(k string, brd *pb.Bridge) error {
+		logrus.Infof("%s => %s", k, brd.String())
 		return nil
 	})
-	logrus.Tracef("Propagating: %s:%s - Total Listeners: %v", b.Name, b.Bridgeop, s.chmux.Len())
-	s.chmux.Broadcast([]*pb.Bridge{b})
+
+	logrus.Tracef("Propagating: %s:%s", brd.Name, brd.Bridgeop)
+	s.signal.Broadcast(brd)
 }
 
 func (s *server) AddEp(b *pb.Bridge) {

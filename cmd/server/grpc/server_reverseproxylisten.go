@@ -54,7 +54,6 @@ func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) erro
 			trace("closing listener for %s (context cancelled)", name)
 		}
 		maybeSend(err)
-		return
 	}
 
 	loopListener := func() {
