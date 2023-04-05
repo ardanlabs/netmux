@@ -14,7 +14,7 @@ import (
 	"github.com/natefinch/lumberjack"
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
+	"go.digitalcircle.com.br/dc/netmux/foundation/config"
 	"go.digitalcircle.com.br/dc/netmux/lib/events"
 	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
@@ -39,19 +39,32 @@ func (s server) Load(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 func (s server) SetConfig(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	logrus.Infof("Loading config from: %s", req.Msg)
 	service.Reset()
-	config.Default().Fname = req.Msg
-	err := config.Default().Save()
+
+	cfg, err := config.Load()
 	if err != nil {
 		return nil, err
 	}
-	err = service.Default().Load(req.Msg)
+
+	if _, err := cfg.UpdateFName(req.Msg); err != nil {
+		return nil, err
+	}
+
+	if err := service.Default().Load(req.Msg); err != nil {
+		return nil, err
+	}
+
 	return &pb.Noop{}, err
 }
 
 func (s server) GetConfig(ctx context.Context, req *pb.Noop) (*pb.StringMsg, error) {
-	res := &pb.StringMsg{Msg: config.Default().Fname}
-	return res, nil
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
 
+	res := &pb.StringMsg{Msg: cfg.FName}
+
+	return res, nil
 }
 
 func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
@@ -61,7 +74,12 @@ func (s server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error
 		return nil, fmt.Errorf("context not found")
 	}
 
-	nxctx.Token = config.Default().Tokens[req.Msg]
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	nxctx.Token = cfg.Tokens[req.Msg]
 
 	var chCtxReady = make(chan struct{})
 	var chErr = make(chan error)
@@ -185,18 +203,23 @@ func (s server) PfOff(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) 
 }
 
 func (s server) Login(ctx context.Context, req *pb.LoginMessage) (*pb.StringMsg, error) {
-
 	nxctx := service.Default().CtxByName(req.Context)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Context)
 	}
+
 	tk, err := nxctx.Login(req.Username, req.Password)
 	if err != nil {
 		return nil, err
 	}
-	config.Default().Tokens[req.Context] = tk
-	err = config.Default().Save()
+
+	cfg, err := config.Load()
 	if err != nil {
+		return nil, err
+	}
+
+	cfg.Tokens[req.Context] = tk
+	if err := cfg.Save(); err != nil {
 		return nil, err
 	}
 
@@ -208,13 +231,18 @@ func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Msg)
 	}
-	err := nxctx.Logout()
+
+	if err := nxctx.Logout(); err != nil {
+		return nil, err
+	}
+
+	cfg, err := config.Load()
 	if err != nil {
 		return nil, err
 	}
-	config.Default().Tokens[req.Msg] = ""
-	err = config.Default().Save()
-	if err != nil {
+
+	cfg.Tokens[req.Msg] = ""
+	if err := cfg.Save(); err != nil {
 		return nil, err
 	}
 
@@ -304,10 +332,17 @@ func (s server) Events(req *pb.Noop, res pb.Agent_EventsServer) error {
 	}
 }
 
-func buildStatus(resetCounters bool) *pb.StatusResponse {
+func buildStatus(resetCounters bool) (*pb.StatusResponse, error) {
 	var ret = pb.StatusResponse{}
-	ret.Fname = config.Default().Fname
+
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	ret.Fname = cfg.FName
 	ret.Version = service.Ver + " - " + service.Semver
+
 	for i := range service.Default().Contexts {
 		actx := service.Default().Contexts[i]
 		ctx := &pb.ContextStatusResponse{}
@@ -338,15 +373,20 @@ func buildStatus(resetCounters bool) *pb.StatusResponse {
 		}
 		ret.Contexts = append(ret.Contexts, ctx)
 	}
+
 	if resetCounters {
 		service.Default().ResetCounters()
 	}
-	return &ret
+
+	return &ret, nil
 }
 
 func (s server) Status(_ context.Context, req *pb.StringMsg) (*pb.StatusResponse, error) {
-	reset := req.Msg == "zero"
-	res := buildStatus(reset)
+	res, err := buildStatus(req.Msg == "zero")
+	if err != nil {
+		return nil, err
+	}
+
 	return res, nil
 
 }
@@ -473,25 +513,24 @@ func Run(actuser *user.User) error {
 	logrus.Infof("Starting server: %s / %s", service.Default().Semver, service.Default().Semver)
 
 	logrus.Infof("Running server as: %s", actuser.Username)
-	cfg := os.Getenv("CONFIG")
-	if cfg != "" {
-		logrus.Infof("Using config from env: %s", cfg)
-		config.Default().Src = cfg
-	} else {
-		config.Default().Src = "/etc/netmux.yaml"
+	cfgSource := os.Getenv("CONFIG")
+	if cfgSource == "" {
+		cfgSource = "/etc/netmux.yaml"
 	}
-	err := config.Default().Load()
+
+	cfg, err := config.LoadFile(cfgSource)
 	if err != nil {
 		return err
 	}
-	if config.Default().Fname != "" {
-		logrus.Infof("Using config: %s", config.Default().Fname)
+
+	if cfg.FName != "" {
+		logrus.Infof("Using config: %s", cfg.FName)
 		count := 0
 		for {
-			_, err := os.Stat(config.Default().Fname)
+			_, err := os.Stat(cfg.FName)
 			if err == nil {
-				logrus.Infof("Loading config: %s", config.Default().Fname)
-				service.Default().Load(config.Default().Fname)
+				logrus.Infof("Loading config: %s", cfg.FName)
+				service.Default().Load(cfg.FName)
 
 				break
 			}

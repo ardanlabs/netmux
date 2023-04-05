@@ -13,7 +13,6 @@ func init() {
 }
 
 func Login(username string, pass string) (string, error) {
-
 	usr, err := user.Current()
 	if err != nil {
 		return "", err

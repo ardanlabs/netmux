@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	_ "embed"
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/server/grpc"
 	"go.digitalcircle.com.br/dc/netmux/cmd/server/k8s"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
-	"os"
 )
 
 //go:embed version
@@ -19,10 +19,7 @@ var semver string
 func main() {
 	logrus.Infof("netmux server starting - ver: %s - %s", semver, ver)
 	logrus.SetLevel(logrus.TraceLevel)
-	err := config.Default().Load()
-	if err != nil {
-		panic(err)
-	}
+
 	mns, err := k8s.MyNamespace()
 	if err != nil {
 		logrus.Warnf("Could not determine own namespace")

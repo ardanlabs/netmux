@@ -2,15 +2,15 @@ package grpc
 
 import (
 	"context"
+	"net"
+	"time"
+
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/server/auth"
 	"go.digitalcircle.com.br/dc/netmux/lib/chmux"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
 	"go.digitalcircle.com.br/dc/netmux/lib/memdb"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"google.golang.org/grpc"
-	"net"
-	"time"
 )
 
 type server struct {
@@ -109,10 +109,7 @@ func Run() error {
 	if err != nil {
 		return err
 	}
-	err = config.Default().Load()
-	if err != nil {
-		return err
-	}
+
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(authUnaryServerInterceptor()),
 		grpc.StreamInterceptor(authStreamServerInterceptor()),

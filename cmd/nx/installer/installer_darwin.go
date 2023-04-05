@@ -15,8 +15,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/foundation/config"
 	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
 )
 
 var VarContext = []byte("${CONTEXT}")
@@ -46,12 +46,12 @@ func AutoInstall(ctx string, ns string, arch string) error {
 		return err
 	}
 
-	err = config.Default().Load()
+	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
 
-	err = service.Default().Load(config.Default().Fname)
+	err = service.Default().Load(cfg.FName)
 	if err != nil {
 		return err
 	}
@@ -157,11 +157,16 @@ func configFileSetup(ctx string, ns string) error {
 		return fmt.Errorf("could not resolve underlying user: %s", err.Error())
 	}
 
+	// TODO: Why are we do this outside of the config package?
+	//       This on 169 is SO dangerous since it only lives in memory.
+	//       I have no idea how to fix this problem right now.
+	//       I really want to pass the config out of this function.
+
 	cfgFName := filepath.Join(usr.HomeDir, ".netmux.yaml")
 	_, err = os.Stat(cfgFName)
 	if err == nil {
 		logrus.Warnf("A config file already exists - will not create a default one")
-		config.Default().Fname = cfgFName
+		// TODO: config.Default().Fname = cfgFName
 		return nil
 	}
 
@@ -186,9 +191,12 @@ func configFileSetup(ctx string, ns string) error {
 		return err
 	}
 
-	config.Default().Fname = cfgFName
-	err = config.Default().Save()
+	cfg, err := config.Load()
 	if err != nil {
+		return err
+	}
+
+	if _, err := cfg.UpdateFName(cfgFName); err != nil {
 		return err
 	}
 

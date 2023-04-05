@@ -6,49 +6,63 @@ import (
 	_ "embed"
 	"time"
 
+	"go.digitalcircle.com.br/dc/netmux/foundation/config"
 	"go.digitalcircle.com.br/dc/netmux/foundation/hash"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func Login(user string, pass string) (string, error) {
-	mx.Lock()
-	defer mx.Unlock()
 	pwd, err := resolveConfig()
 	if err != nil {
 		return "", err
 	}
+
 	for _, e := range pwd.Entries {
 		if e.User == user {
-			err := hash.Decode(e.Hash, pass)
-			if err != nil {
+			if err := hash.Decode(e.Hash, pass); err != nil {
 				return "", ErrAuthError
+			}
+
+			cfg, err := config.Load()
+			if err != nil {
+				return "", err
 			}
 
 			rand.Seed(time.Now().UnixMilli())
 			uid := rand.String(32)
-			config.Default().Tokens[uid] = user
-			err = config.Default().Save()
-			return uid, err
 
+			cfg.Tokens[uid] = user
+			if err := cfg.Save(); err != nil {
+				return "", err
+			}
+
+			return uid, nil
 		}
 	}
+
 	return "", ErrUserNotFound
 }
 
 func Logout(token string) error {
-	mx.Lock()
-	defer mx.Unlock()
-	delete(config.Default().Tokens, token)
-	return config.Default().Save()
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	delete(cfg.Tokens, token)
+	return cfg.Save()
 }
 
 func Check(token string) (string, error) {
-	mx.RLock()
-	defer mx.RUnlock()
-	user, ok := config.Default().Tokens[token]
+	cfg, err := config.Load()
+	if err != nil {
+		return "", err
+	}
+
+	user, ok := cfg.Tokens[token]
 	if ok && user != "" {
 		return user, nil
 	}
+
 	return "", ErrTokenNotFound
 }

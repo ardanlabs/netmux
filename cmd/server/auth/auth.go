@@ -3,10 +3,10 @@ package auth
 import (
 	_ "embed"
 	"fmt"
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-	"os"
-	"sync"
 )
 
 type PasswdEntry struct {
@@ -35,8 +35,6 @@ func resolveConfig() (*Passwd, error) {
 	err = yaml.Unmarshal(bs, ret)
 	return ret, err
 }
-
-var mx sync.RWMutex
 
 var ErrUserNotFound = fmt.Errorf("user not found")
 var ErrAuthError = fmt.Errorf("auth error")
