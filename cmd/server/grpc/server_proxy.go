@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
@@ -22,7 +23,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 	}
 	logrus.Debugf("Got Proxy conn: %s", bridge.String())
 
-	eps := s.eps.Get(bridge.Name)
+	eps, _ := s.eps.Get(bridge.Name)
 	if eps == nil {
 		logrus.Warnf("could not find ep for %s", bridge.String())
 		return fmt.Errorf("could not find ep for %s", bridge.String())

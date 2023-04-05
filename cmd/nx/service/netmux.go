@@ -12,7 +12,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
-	"go.digitalcircle.com.br/dc/netmux/lib/memdb"
 	"gopkg.in/yaml.v3"
 )
 
@@ -71,7 +70,7 @@ type Netmux struct {
 	// Transient info
 	ctx    context.Context
 	cancel func()
-	tokens memdb.Memdb[string]
+	// tokens db.DB[string]   // TODO: Not being used?
 
 	SourceFile string `yaml:"-"`
 	Username   string `yaml:"-"`

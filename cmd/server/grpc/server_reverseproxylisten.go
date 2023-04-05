@@ -3,12 +3,13 @@ package grpc
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net"
+
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
-	"io"
-	"net"
 )
 
 func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) error {
@@ -80,7 +81,7 @@ func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) erro
 			})
 			if err != nil {
 				c.Close()
-				s.conns.Del(uid)
+				s.conns.Delete(uid)
 				maybeSend(err)
 				return
 			}

@@ -8,6 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// TODO: Instead of using a filename, let's use a io.ReadWriter.
+
 // TODO: I have seen code that wanted to synchronize access to the config, but
 // it wasn't right. I don't know if this is the best way yet to do this, but I
 // know it will protect the existing code. I have not been able to clean all

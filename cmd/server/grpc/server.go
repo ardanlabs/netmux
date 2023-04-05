@@ -7,19 +7,18 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.digitalcircle.com.br/dc/netmux/cmd/server/auth"
+	"go.digitalcircle.com.br/dc/netmux/foundation/db"
 	"go.digitalcircle.com.br/dc/netmux/lib/chmux"
-	"go.digitalcircle.com.br/dc/netmux/lib/memdb"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"google.golang.org/grpc"
 )
 
 type server struct {
 	pb.UnsafeNXProxyServer
-	eps      memdb.Memdb[*pb.Bridge]
-	sessions memdb.Memdb[string]
-	conns    memdb.Memdb[net.Conn]
-
-	chmux *chmux.ChMux[[]*pb.Bridge]
+	eps      *db.DB[*pb.Bridge]
+	sessions *db.DB[string]
+	conns    *db.DB[net.Conn]
+	chmux    *chmux.ChMux[[]*pb.Bridge]
 }
 
 func (s server) mustEmbedUnimplementedServerServiceServer() {
@@ -44,12 +43,12 @@ func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error)
 }
 
 func (s server) GetConfigs(ctx context.Context, req *pb.Noop) (*pb.Bridges, error) {
-	ret := &pb.Bridges{Eps: s.eps.Items()}
+	ret := &pb.Bridges{Eps: s.eps.KeyValues().Values()}
 	return ret, nil
 }
 
 func (s server) StreamConfig(req *pb.Noop, server pb.NXProxy_StreamConfigServer) error {
-	ret := &pb.Bridges{Eps: s.eps.Items()}
+	ret := &pb.Bridges{Eps: s.eps.KeyValues().Values()}
 	err := server.Send(ret)
 	if err != nil {
 		logrus.Warnf("Error sending initial cfg: %s", err.Error())
@@ -97,9 +96,9 @@ func (s server) KeepAlive(req *pb.Noop, res pb.NXProxy_KeepAliveServer) error {
 }
 
 var aServer = server{
-	eps:      memdb.New[*pb.Bridge](),
-	sessions: memdb.New[string](),
-	conns:    memdb.New[net.Conn](),
+	eps:      db.New[*pb.Bridge](db.NopReadWriter{}),
+	sessions: db.New[string](db.NopReadWriter{}),
+	conns:    db.New[net.Conn](db.NopReadWriter{}),
 	chmux:    chmux.New[[]*pb.Bridge](),
 }
 

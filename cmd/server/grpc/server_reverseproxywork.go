@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
@@ -20,13 +21,13 @@ func (s server) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) error {
 	if err != nil {
 		return err
 	}
-	c := s.conns.Get(in.ConnId)
+	c, _ := s.conns.Get(in.ConnId)
 	if c == nil {
 		return fmt.Errorf("connection not found for %s", in.ConnId)
 	}
 
 	defer func() {
-		s.conns.Del(in.ConnId)
+		s.conns.Delete(in.ConnId)
 	}()
 
 	logrus.Debugf("REV conn working: %s", in.ConnId)

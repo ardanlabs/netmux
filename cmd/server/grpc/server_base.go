@@ -7,9 +7,9 @@ import (
 
 func (s *server) propagate(b *pb.Bridge) {
 	logrus.Infof("Actual data:")
-	s.eps.ForEach(func(k string, v *pb.Bridge) bool {
+	s.eps.ForEach(func(k string, v *pb.Bridge) error {
 		logrus.Infof("%s => %s", k, v.String())
-		return true
+		return nil
 	})
 	logrus.Tracef("Propagating: %s:%s - Total Listeners: %v", b.Name, b.Bridgeop, s.chmux.Len())
 	s.chmux.Broadcast([]*pb.Bridge{b})
@@ -17,7 +17,7 @@ func (s *server) propagate(b *pb.Bridge) {
 
 func (s *server) AddEp(b *pb.Bridge) {
 	b.Bridgeop = "A"
-	existing := s.eps.Get(b.Name)
+	existing, _ := s.eps.Get(b.Name)
 	if existing != nil {
 		if existing.K8Snamespace == b.K8Snamespace && existing.K8Sname == b.K8Sname && existing.K8Skind == b.K8Skind {
 			logrus.Infof("Adding ep: %s", b.String())
@@ -31,11 +31,11 @@ func (s *server) AddEp(b *pb.Bridge) {
 }
 func (s *server) RemEp(b *pb.Bridge) {
 	b.Bridgeop = "D"
-	existing := s.eps.Get(b.Name)
+	existing, _ := s.eps.Get(b.Name)
 	if existing != nil {
 		if existing.K8Snamespace == b.K8Snamespace && existing.K8Sname == b.K8Sname && existing.K8Skind == b.K8Skind {
 			logrus.Infof("Removing ep: %s", b.String())
-			s.eps.Del(b.Name)
+			s.eps.Delete(b.Name)
 			s.propagate(b)
 		}
 		return
