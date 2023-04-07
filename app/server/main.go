@@ -88,7 +88,7 @@ func run(log *logrus.Logger) error {
 	log.Infof("startup: config: %s", out)
 
 	// =========================================================================
-	// K8s Configuration
+	// Monitor Configuration
 
 	var mntCfg monitor.Config
 	switch cfg.Server.Mode {
