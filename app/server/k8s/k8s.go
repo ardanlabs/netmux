@@ -3,10 +3,13 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/server/grpc"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
-	"go.digitalcircle.com.br/dc/netmux/lib/types"
+	"go.digitalcircle.com.br/dc/netmux/app/server/grpc"
+	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,9 +18,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func resolveConfig(fname string) (*rest.Config, error) {
@@ -72,26 +72,22 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 	handlePod := func(evt watch.EventType, dep *corev1.Pod) {
 
 		if dep.Annotations["nx"] != "" {
-
-			nxas := types.NewBridges()
-
-			err := nxas.LoadFromAnnotation(dep.Annotations["nx"])
+			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
 			if err != nil {
 				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
 				return
 			}
 			for i := range nxas {
 				nxa := nxas[i]
-				if nxa.RemoteAddr == "" {
-					nxa.RemoteAddr = dep.Status.PodIP
+				if nxa.RemoteHost == "" {
+					nxa.RemoteHost = dep.Status.PodIP
 				}
 
 				if nxa.RemotePort == "" {
 					nxa.RemotePort = fmt.Sprintf("%v", dep.Spec.Containers[0].Ports[0].ContainerPort)
 				}
 
-				ep := &pb.Bridge{}
-				nxa.ToPb(ep)
+				ep := bridge.ToProtoBufBridge(nxa)
 				ep.K8Snamespace = dep.Namespace
 				ep.K8Sname = dep.Name
 				ep.K8Skind = dep.Kind
@@ -111,9 +107,7 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 	handleService := func(evt watch.EventType, dep *corev1.Service) {
 		if dep.Annotations["nx"] != "" {
 
-			nxas := types.NewBridges()
-			err := nxas.LoadFromAnnotation(dep.Annotations["nx"])
-
+			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
 			if err != nil {
 				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
 				return
@@ -125,8 +119,8 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 					return
 				}
 
-				if nxa.RemoteAddr == "" {
-					nxa.RemoteAddr = dep.Spec.ClusterIP
+				if nxa.RemoteHost == "" {
+					nxa.RemoteHost = dep.Spec.ClusterIP
 				}
 
 				if nxa.RemotePort == "" {
@@ -140,11 +134,10 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 				}
 
 				if nxa.Direction == "" {
-					nxa.Direction = types.BridgeReward
+					nxa.Direction = bridge.DirectionReward
 				}
 
-				ep := &pb.Bridge{}
-				nxa.ToPb(ep)
+				ep := bridge.ToProtoBufBridge(nxa)
 				ep.K8Snamespace = dep.Namespace
 				ep.K8Sname = dep.Name
 				ep.K8Skind = dep.Kind
@@ -164,8 +157,7 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 	handleDeployments := func(evt watch.EventType, dep *appv1.Deployment) {
 		if dep.Annotations["nx"] != "" {
 
-			nxas := types.NewBridges()
-			err := nxas.LoadFromAnnotation(dep.Annotations["nx"])
+			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
 			if err != nil {
 				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
 				return
@@ -176,18 +168,18 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 
 				if nxa.Name == "" {
 					logrus.Warnf("Fixing Name: %s.%s", dep.Namespace, dep.Name)
-					nxa.RemoteAddr = dep.Name + "." + dep.Namespace
+					nxa.RemoteHost = dep.Name + "." + dep.Namespace
 
 				}
 
-				if nxa.RemoteAddr == "" {
-					nxa.RemoteAddr = dep.Name + "." + dep.Namespace
+				if nxa.RemoteHost == "" {
+					nxa.RemoteHost = dep.Name + "." + dep.Namespace
 					logrus.Warnf("Fixing remote addr: %s.%s", dep.Namespace, dep.Name)
 
 				}
 
-				if nxa.LocalAddr == "" {
-					nxa.LocalAddr = dep.Name + "." + dep.Namespace
+				if nxa.LocalHost == "" {
+					nxa.LocalHost = dep.Name + "." + dep.Namespace
 					logrus.Warnf("Fixing local addr: %s.%s", dep.Namespace, dep.Name)
 
 				}
@@ -205,11 +197,10 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 				}
 
 				if nxa.Direction == "" {
-					nxa.Direction = types.BridgeForward
+					nxa.Direction = bridge.DirectionForward
 				}
 
-				ep := &pb.Bridge{}
-				nxa.ToPb(ep)
+				ep := bridge.ToProtoBufBridge(nxa)
 				ep.K8Snamespace = dep.Namespace
 				ep.K8Sname = dep.Name
 				ep.K8Skind = dep.Kind
@@ -228,29 +219,29 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 
 	handleStatefulSets := func(evt watch.EventType, dep *appv1.StatefulSet) {
 		if dep.Annotations["nx"] != "" {
-			nxas := types.NewBridges()
-			err := nxas.LoadFromAnnotation(dep.Annotations["nx"])
+			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
 			if err != nil {
 				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
 				return
 			}
+
 			for i := range nxas {
 				nxa := nxas[i]
 
 				if nxa.Name == "" {
 					logrus.Warnf("Fixing Name: %s.%s", dep.Namespace, dep.Name)
-					nxa.RemoteAddr = dep.Name + "." + dep.Namespace
+					nxa.RemoteHost = dep.Name + "." + dep.Namespace
 
 				}
 
-				if nxa.RemoteAddr == "" {
-					nxa.RemoteAddr = dep.Name + "." + dep.Namespace
+				if nxa.RemoteHost == "" {
+					nxa.RemoteHost = dep.Name + "." + dep.Namespace
 					logrus.Warnf("Fixing remote addr: %s.%s", dep.Namespace, dep.Name)
 
 				}
 
-				if nxa.LocalAddr == "" {
-					nxa.LocalAddr = dep.Name + "." + dep.Namespace
+				if nxa.LocalHost == "" {
+					nxa.LocalHost = dep.Name + "." + dep.Namespace
 					logrus.Warnf("Fixing local addr: %s.%s", dep.Namespace, dep.Name)
 
 				}
@@ -268,11 +259,10 @@ func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) err
 				}
 
 				if nxa.Direction == "" {
-					nxa.Direction = types.BridgeForward
+					nxa.Direction = bridge.DirectionForward
 				}
 
-				ep := &pb.Bridge{}
-				nxa.ToPb(ep)
+				ep := bridge.ToProtoBufBridge(nxa)
 				ep.K8Snamespace = dep.Namespace
 				ep.K8Sname = dep.Name
 				ep.K8Skind = dep.Kind

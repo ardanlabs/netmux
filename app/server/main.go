@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/server/grpc"
-	"go.digitalcircle.com.br/dc/netmux/cmd/server/k8s"
+	"go.digitalcircle.com.br/dc/netmux/app/server/grpc"
+	"go.digitalcircle.com.br/dc/netmux/app/server/k8s"
 )
 
 //go:embed version

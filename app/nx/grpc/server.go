@@ -13,7 +13,7 @@ import (
 
 	"github.com/natefinch/lumberjack"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
 	"go.digitalcircle.com.br/dc/netmux/foundation/config"
 	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
 	"go.digitalcircle.com.br/dc/netmux/foundation/signal"
@@ -372,12 +372,12 @@ func buildStatus(resetCounters bool) (*pb.StatusResponse, error) {
 		ctx.Portforward = fmt.Sprintf("%#v", actx.EnablePortForward)
 		for j := range actx.Services {
 			asvc := actx.Services[j]
-			if asvc.Bridge != nil {
+			if asvc.Bridge.IsZero() {
 				svc := &pb.ServiceStatusResponse{
 					Name:       asvc.Name(),
-					Localaddr:  asvc.Bridge.LocalAddr,
+					Localaddr:  asvc.Bridge.LocalHost,
 					Localport:  asvc.Bridge.LocalPort,
-					Remoteaddr: asvc.Bridge.RemoteAddr,
+					Remoteaddr: asvc.Bridge.RemoteHost,
 					Remoteport: asvc.Bridge.RemotePort,
 					Proto:      asvc.Bridge.Proto,
 					Auto:       fmt.Sprintf("%#v", asvc.Bridge.Auto),

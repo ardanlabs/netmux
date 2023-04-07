@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
-	"go.digitalcircle.com.br/dc/netmux/lib/types"
 )
 
 func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) error {
@@ -17,7 +17,7 @@ func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) erro
 	var err error
 	var l net.Listener
 	var chErr = make(chan error)
-	var bridge = &types.Bridge{}
+	var b bridge.Bridge
 
 	trace := func(s string, p ...interface{}) {
 		logrus.Tracef("ReverseProxyListen: %s", fmt.Sprintf(s, p...))
@@ -44,8 +44,8 @@ func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) erro
 		}
 
 		name := "no bridge"
-		if bridge != nil {
-			name = bridge.Name
+		if !b.IsZero() {
+			name = b.Name
 		}
 
 		if err != nil {
@@ -65,7 +65,7 @@ func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) erro
 			c, err := l.Accept()
 			if err != nil {
 				warn("Could accept conn for reverse ep connection to %s: %s",
-					bridge.String(), err.Error())
+					b.String(), err.Error())
 				l.Close()
 				l = nil
 				maybeSend(err)
@@ -111,18 +111,18 @@ func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) erro
 				trace("Received call, but listener still in place")
 				return
 			default:
-				bridge.FromPb(in.Bridge)
-				logrus.Tracef("Proxy will listen: %s", bridge.String())
+				b = bridge.ToBridge(in.Bridge)
+				logrus.Tracef("Proxy will listen: %s", b.String())
 
-				l, err = bridge.ListenerOnRemoteHost()
+				l, err = b.RemotePortListener()
 
 				if err != nil {
 					logrus.Warnf("Could not make proxy listener for reverse ep connection to %s: %s",
-						bridge.String(), err.Error())
+						b.String(), err.Error())
 					maybeSend(err)
 					closeListener()
 				}
-				logrus.Debugf("Listening %s %s: OK", bridge.Name, bridge.RemotePort)
+				logrus.Debugf("Listening %s %s: OK", b.Name, b.RemotePort)
 				go loopListener()
 			}
 		}

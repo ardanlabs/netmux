@@ -5,16 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/dustin/go-humanize"
 	"github.com/gdamore/tcell/v2"
 	"github.com/hpcloud/tail"
 	"github.com/rivo/tview"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
 	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
-	"os"
-	"strings"
-	"time"
 )
 
 func renderTable(tb *tview.Table, cfg *service.Netmux) int {

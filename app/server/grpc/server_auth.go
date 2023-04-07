@@ -3,8 +3,9 @@ package grpc
 import (
 	"context"
 	"errors"
+
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/server/auth"
+	"go.digitalcircle.com.br/dc/netmux/app/server/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )

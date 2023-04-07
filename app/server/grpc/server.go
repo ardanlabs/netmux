@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/server/auth"
+	"go.digitalcircle.com.br/dc/netmux/app/server/auth"
 	"go.digitalcircle.com.br/dc/netmux/foundation/db"
 	"go.digitalcircle.com.br/dc/netmux/foundation/signal"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"

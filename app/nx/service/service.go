@@ -8,15 +8,15 @@ import (
 	"net"
 
 	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
 	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
 	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
-	"go.digitalcircle.com.br/dc/netmux/lib/types"
 )
 
 type Service struct {
 	parent *Context
-	Bridge *types.Bridge
+	Bridge bridge.Bridge
 	ctx    context.Context
 	cancel func()
 	hosts  *hosts.Hosts
@@ -77,7 +77,7 @@ func (s *Service) listen() error {
 		}
 		return nil
 	})
-	s.hosts.Add(s.IpAddr, []string{s.Bridge.LocalAddr}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
+	s.hosts.Add(s.IpAddr, []string{s.Bridge.LocalHost}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
 
 	s.uuidHostname = TermHanlder.add(func() error {
 		s.uuidHostname = ""
@@ -93,10 +93,9 @@ func (s *Service) listen() error {
 
 		return err
 	}
-	s.Bridge.LocalAddr = s.IpAddr
+	s.Bridge.LocalHost = s.IpAddr
 	logrus.Tracef("Agent will listen: %s", s.Bridge.String())
-	s.Listener, err = s.Bridge.ListenerLocal()
-
+	s.Listener, err = s.Bridge.LocalListener()
 	if err != nil {
 		logrus.Warnf("error listening: %v", err)
 		return err
@@ -155,7 +154,7 @@ func (s *Service) Start() error {
 	}()
 
 	switch s.Bridge.Direction {
-	case types.BridgeReward:
+	case bridge.DirectionReward:
 		chErr := make(chan error)
 		go s.StartReverseServiceGrpc(chErr)
 		if err := <-chErr; err != nil {
@@ -163,8 +162,7 @@ func (s *Service) Start() error {
 		}
 		close(chErr)
 
-	case types.BridgeForward:
-
+	case bridge.DirectionForward:
 		err = s.StartForward()
 		if err != nil {
 			logrus.Warnf("error setting up ref conn for %s: %s", s.Name(), err.Error())
@@ -206,10 +204,8 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 		return err
 	}
 
-	pbb := &pb.Bridge{}
-	s.Bridge.ToPb(pbb)
 	err = proxyStream.Send(&pb.ConnOut{
-		Bridge: pbb,
+		Bridge: bridge.ToProtoBufBridge(s.Bridge),
 		Pl:     nil,
 	})
 	if err != nil {
@@ -291,9 +287,7 @@ func (s *Service) StartReverseServiceGrpc(chErr chan error) {
 		return
 	}
 
-	pbb := &pb.Bridge{}
-	s.Bridge.ToPb(pbb)
-	err = lcli.Send(&pb.ConnOut{Bridge: pbb})
+	err = lcli.Send(&pb.ConnOut{Bridge: bridge.ToProtoBufBridge(s.Bridge)})
 	if err != nil {
 		logrus.Warnf("Error opening remote rev proxy listener conn %s: %s", s.Name(), err.Error())
 		chErr <- err
@@ -326,7 +320,7 @@ func (s *Service) handleDataConnGrpc(id string) {
 		logrus.Warnf("error opening ReverseProxyWork: %s", err.Error())
 		return
 	}
-	c, err := s.Bridge.DialLocal()
+	c, err := s.Bridge.LocalDial()
 	if err != nil {
 		logrus.Warnf("error dialing: %s", err.Error())
 		return

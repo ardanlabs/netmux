@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
 	"go.digitalcircle.com.br/dc/netmux/foundation/config"
 	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 )

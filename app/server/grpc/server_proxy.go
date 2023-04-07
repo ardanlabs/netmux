@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
-	"go.digitalcircle.com.br/dc/netmux/lib/types"
 )
 
 func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
@@ -16,24 +16,24 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 	if co.Bridge == nil {
 		return fmt.Errorf("bridge info not provided at Proxy")
 	}
-	var bridge = &types.Bridge{}
+	var b bridge.Bridge
 	if co.Bridge != nil {
-		bridge.FromPb(co.Bridge)
+		b = bridge.ToBridge(co.Bridge)
 	}
-	logrus.Debugf("Got Proxy conn: %s", bridge.String())
+	logrus.Debugf("Got Proxy conn: %s", b.String())
 
-	eps, _ := s.eps.Get(bridge.Name)
+	eps, _ := s.eps.Get(b.Name)
 	if eps == nil {
-		logrus.Warnf("could not find ep for %s", bridge.String())
-		return fmt.Errorf("could not find ep for %s", bridge.String())
+		logrus.Warnf("could not find ep for %s", b.String())
+		return fmt.Errorf("could not find ep for %s", b.String())
 	}
-	c, err := bridge.DialRemote()
+	c, err := b.RemoteDial()
 	if err != nil {
-		err = fmt.Errorf("could not make proxy ep connection to %s: %w", bridge.String(), err)
+		err = fmt.Errorf("could not make proxy ep connection to %s: %w", b.String(), err)
 		logrus.Warnf(err.Error())
 		return err
 	}
-	logrus.Debugf("Connected to: %s", bridge.String())
+	logrus.Debugf("Connected to: %s", b.String())
 
 	chErr := make(chan error)
 
@@ -41,7 +41,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 		for {
 			co, err := connectServer.Recv()
 			if err != nil {
-				chErr <- fmt.Errorf("error receiving data from local %s: %w", bridge.Name, err)
+				chErr <- fmt.Errorf("error receiving data from local %s: %w", b.Name, err)
 				c.Close()
 				chErr <- err
 				return
@@ -50,7 +50,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 				_, err = c.Write(co.Pl)
 				if err != nil {
 					c.Close()
-					chErr <- fmt.Errorf("error sending data from proxy %s: %w", bridge.Name, err)
+					chErr <- fmt.Errorf("error sending data from proxy %s: %w", b.Name, err)
 					return
 				}
 			}
@@ -62,7 +62,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 		for {
 			n, err := c.Read(buf)
 			if err != nil {
-				chErr <- fmt.Errorf("error receiving data from proxy %s: %s", bridge.Name, err.Error())
+				chErr <- fmt.Errorf("error receiving data from proxy %s: %s", b.Name, err.Error())
 				c.Close()
 				chErr <- err
 				return
@@ -73,7 +73,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 				Err: "",
 			})
 			if err != nil {
-				chErr <- fmt.Errorf("error sending data to local %s: %w", bridge.Name, err)
+				chErr <- fmt.Errorf("error sending data to local %s: %w", b.Name, err)
 				c.Close()
 
 				chErr <- err

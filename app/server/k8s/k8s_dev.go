@@ -3,10 +3,11 @@ package k8s
 import (
 	"context"
 	"fmt"
+
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/server/grpc"
+	"go.digitalcircle.com.br/dc/netmux/app/server/grpc"
+	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
-	"go.digitalcircle.com.br/dc/netmux/lib/types"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -50,9 +51,7 @@ func runNamespaceDevSimpleNS(ctx context.Context, cli *kubernetes.Clientset, ns 
 	handleService := func(evt watch.EventType, dep *corev1.Service) {
 		if dep.Annotations["nx"] != "" {
 
-			nxas := types.NewBridges()
-			err := nxas.LoadFromAnnotation(dep.Annotations["nx"])
-
+			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
 			if err != nil {
 				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
 				return
@@ -64,12 +63,12 @@ func runNamespaceDevSimpleNS(ctx context.Context, cli *kubernetes.Clientset, ns 
 					logrus.Warnf("Using name from service: %s.%s", dep.Namespace, dep.Name)
 				}
 
-				if nxa.RemoteAddr == "" {
-					nxa.RemoteAddr = dep.Spec.ClusterIP
+				if nxa.RemoteHost == "" {
+					nxa.RemoteHost = dep.Spec.ClusterIP
 				}
 
-				if nxa.LocalAddr == "" {
-					nxa.LocalAddr = dep.Name
+				if nxa.LocalHost == "" {
+					nxa.LocalHost = dep.Name
 				}
 
 				if nxa.RemotePort == "" {
@@ -83,11 +82,10 @@ func runNamespaceDevSimpleNS(ctx context.Context, cli *kubernetes.Clientset, ns 
 				}
 
 				if nxa.Direction == "" {
-					nxa.Direction = types.BridgeForward
+					nxa.Direction = bridge.DirectionForward
 				}
 
-				ep := &pb.Bridge{}
-				nxa.ToPb(ep)
+				ep := bridge.ToProtoBufBridge(nxa)
 				ep.K8Snamespace = dep.Namespace
 				ep.K8Sname = dep.Name
 				ep.K8Skind = dep.Kind
@@ -109,7 +107,7 @@ func runNamespaceDevSimpleNS(ctx context.Context, cli *kubernetes.Clientset, ns 
 			ep.Remoteport = fmt.Sprintf("%v", dep.Spec.Ports[0].Port)
 			ep.Localaddr = dep.Name
 			ep.Localport = fmt.Sprintf("%v", dep.Spec.Ports[0].Port)
-			ep.Direction = types.BridgeForward
+			ep.Direction = bridge.DirectionForward
 			ep.K8Snamespace = dep.Namespace
 			ep.K8Sname = dep.Name
 			ep.K8Skind = dep.Kind

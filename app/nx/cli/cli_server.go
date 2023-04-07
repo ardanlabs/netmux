@@ -2,10 +2,11 @@ package cli
 
 import (
 	"context"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/grpc"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 	"path/filepath"
 	"strings"
+
+	"go.digitalcircle.com.br/dc/netmux/app/nx/grpc"
+	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 func server() error {

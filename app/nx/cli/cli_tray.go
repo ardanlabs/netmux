@@ -3,7 +3,7 @@ package cli
 import (
 	"os"
 
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/installer"
+	"go.digitalcircle.com.br/dc/netmux/app/nx/installer"
 	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 )
 

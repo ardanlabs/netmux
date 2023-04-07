@@ -2,9 +2,10 @@ package main
 
 import (
 	_ "embed"
+
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/cli"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/app/nx/cli"
+	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
 )
 
 //go:embed version
