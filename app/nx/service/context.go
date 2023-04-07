@@ -7,10 +7,10 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/foundation/hosts"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
-	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -34,7 +34,7 @@ type Context struct {
 	PortForwardProcess        *os.Process `yaml:"-"`
 	PortForwardStatus         Status
 	uuidPortForwardTerminator string
-	cli                       pb.NXProxyClient
+	cli                       proxy.ProxyClient
 	Token                     string
 	NConns                    int
 	Sent                      int64
@@ -43,7 +43,7 @@ type Context struct {
 	Status                    Status
 }
 
-func (c *Context) Cli() pb.NXProxyClient {
+func (c *Context) Cli() proxy.ProxyClient {
 	return c.cli
 }
 
@@ -120,7 +120,7 @@ func (c *Context) StopPortForwarding() error {
 	return nil
 }
 
-func (c *Context) onBridgeChange(ctx context.Context, bs *pb.Bridges) error {
+func (c *Context) onBridgeChange(ctx context.Context, bs *proxy.Bridges) error {
 	for _, e := range bs.Eps {
 		e := e
 		switch e.Bridgeop {
@@ -194,12 +194,12 @@ func (c *Context) Start(ctx context.Context, chReady chan struct{}) error {
 
 	}
 
-	c.cli, err = pb.New(c.UrlAsUrl.Host, c.Token)
+	c.cli, err = proxy.New(c.UrlAsUrl.Host, c.Token)
 	if err != nil {
 		return err
 	}
 
-	//bridges, err := c.cli.GetConfigs(c.ctx, &pb.Noop{})
+	//bridges, err := c.cli.GetConfigs(c.ctx, &proxy.Noop{})
 
 	if err != nil {
 		return err
@@ -217,7 +217,7 @@ func (c *Context) Start(ctx context.Context, chReady chan struct{}) error {
 }
 func (c *Context) monitorBridges() error {
 
-	stream, err := c.cli.StreamConfig(c.ctx, &pb.Noop{})
+	stream, err := c.cli.StreamConfig(c.ctx, &proxy.Noop{})
 	if err != nil {
 		return err
 	}
@@ -264,11 +264,11 @@ func (c *Context) Login(user string, pass string) (string, error) {
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.cli, err = pb.New(c.UrlAsUrl.Host, "")
+	c.cli, err = proxy.New(c.UrlAsUrl.Host, "")
 	if err != nil {
 		return "", err
 	}
-	res, err := c.cli.Login(c.ctx, &pb.LoginReq{
+	res, err := c.cli.Login(c.ctx, &proxy.LoginReq{
 		User: user,
 		Pass: pass,
 	})
@@ -290,11 +290,11 @@ func (c *Context) Logout() error {
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.cli, err = pb.New(c.UrlAsUrl.Host, c.Token)
+	c.cli, err = proxy.New(c.UrlAsUrl.Host, c.Token)
 	if err != nil {
 		return err
 	}
-	_, err = c.cli.Logout(c.ctx, &pb.StringMsg{Msg: c.Token})
+	_, err = c.cli.Logout(c.ctx, &proxy.StringMsg{Msg: c.Token})
 	if err != nil {
 		return err
 	}

@@ -6,8 +6,8 @@ import (
 	_ "embed"
 	"time"
 
-	"go.digitalcircle.com.br/dc/netmux/foundation/config"
-	"go.digitalcircle.com.br/dc/netmux/foundation/hash"
+	"github.com/ardanlabs.com/netmux/foundation/config"
+	"github.com/ardanlabs.com/netmux/foundation/hash"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 

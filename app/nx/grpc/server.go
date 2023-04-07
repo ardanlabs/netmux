@@ -11,14 +11,14 @@ import (
 	"os/user"
 	"time"
 
+	"github.com/ardanlabs.com/netmux/app/nx/service"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/foundation/config"
+	"github.com/ardanlabs.com/netmux/foundation/hosts"
+	"github.com/ardanlabs.com/netmux/foundation/signal"
+	pb "github.com/ardanlabs.com/netmux/lib/proto/agent"
 	"github.com/natefinch/lumberjack"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/foundation/config"
-	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
-	"go.digitalcircle.com.br/dc/netmux/foundation/signal"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
-	pbs "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"google.golang.org/grpc"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
@@ -124,7 +124,7 @@ func (s *server) Connect(ctx context.Context, req *pb.StringMsg) (*pb.Noop, erro
 		return nil, fmt.Errorf("timeout connecting to context: %s", req.Msg)
 	}
 
-	ka, err := nxctx.Cli().KeepAlive(context.Background(), &pbs.Noop{})
+	ka, err := nxctx.Cli().KeepAlive(context.Background(), &proxy.Noop{})
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +424,7 @@ func (s *server) Ping(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, er
 		err := fmt.Errorf("context %s not connected to server", nxctx.Name)
 		return nil, err
 	}
-	res, err := nxctx.Cli().Ping(ctx, &pbs.StringMsg{
+	res, err := nxctx.Cli().Ping(ctx, &proxy.StringMsg{
 		Msg: req.Msg,
 	})
 
@@ -448,7 +448,7 @@ func (s *server) PortScan(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg
 		err := fmt.Errorf("context %s not connected to server", nxctx.Name)
 		return nil, err
 	}
-	res, err := nxctx.Cli().PortScan(ctx, &pbs.StringMsg{
+	res, err := nxctx.Cli().PortScan(ctx, &proxy.StringMsg{
 		Msg: req.Msg,
 	})
 
@@ -469,7 +469,7 @@ func (s *server) SpeedTest(ctx context.Context, req *pb.StringMsg) (*pb.StringMs
 		return nil, err
 	}
 	start := time.Now()
-	res, err := nxctx.Cli().SpeedTest(ctx, &pbs.StringMsg{
+	res, err := nxctx.Cli().SpeedTest(ctx, &proxy.StringMsg{
 		Msg: req.Msg,
 	})
 	dur := time.Since(start)
@@ -507,7 +507,7 @@ func (s *server) Nc(ctx context.Context, req *pb.StringMsg) (*pb.StringMsg, erro
 		err := fmt.Errorf("context %s not connected to server", nxctx.Name)
 		return nil, err
 	}
-	res, err := nxctx.Cli().Nc(ctx, &pbs.StringMsg{
+	res, err := nxctx.Cli().Nc(ctx, &proxy.StringMsg{
 		Msg: req.Msg,
 	})
 

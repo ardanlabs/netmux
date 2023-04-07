@@ -14,9 +14,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/driver/desktop"
+	"github.com/ardanlabs.com/netmux/lib/proto/agent"
 	"github.com/gen2brain/beeep"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 const (

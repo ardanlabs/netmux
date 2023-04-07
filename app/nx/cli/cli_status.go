@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/ardanlabs.com/netmux/lib/proto/agent"
 	"github.com/dustin/go-humanize"
 	"github.com/rodaine/table"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 func status() error {

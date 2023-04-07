@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ardanlabs.com/netmux/app/server/grpc"
+	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/server/grpc"
-	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

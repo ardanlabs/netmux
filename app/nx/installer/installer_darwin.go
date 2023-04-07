@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ardanlabs.com/netmux/app/nx/service"
+	"github.com/ardanlabs.com/netmux/foundation/config"
+	"github.com/ardanlabs.com/netmux/foundation/shell"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/foundation/config"
-	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 )
 
 var VarContext = []byte("${CONTEXT}")

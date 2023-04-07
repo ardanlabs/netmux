@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.digitalcircle.com.br/dc/netmux/app/nx/grpc"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
+	"github.com/ardanlabs.com/netmux/app/nx/grpc"
+	"github.com/ardanlabs.com/netmux/lib/proto/agent"
 )
 
 func server() error {

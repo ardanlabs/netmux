@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"go.digitalcircle.com.br/dc/netmux/app/server/grpc"
-	"go.digitalcircle.com.br/dc/netmux/app/server/k8s"
+	"github.com/ardanlabs.com/netmux/app/server/grpc"
+	"github.com/ardanlabs.com/netmux/app/server/k8s"
 )
 
 func TestRun(t *testing.T) {

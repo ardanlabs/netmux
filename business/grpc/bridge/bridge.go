@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
 	"github.com/google/uuid"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"gopkg.in/yaml.v3"
 )
 
@@ -123,8 +123,8 @@ func (b Bridge) remoteHostPort() string {
 
 // ToProtoBufBridge converts the specified bridge value and marshals it into
 // a protocol buffers bridge value.
-func ToProtoBufBridge(b Bridge) *pb.Bridge {
-	return &pb.Bridge{
+func ToProtoBufBridge(b Bridge) *proxy.Bridge {
+	return &proxy.Bridge{
 		Localport:  b.LocalPort,
 		Localaddr:  b.LocalHost,
 		Remoteport: b.RemotePort,
@@ -138,16 +138,16 @@ func ToProtoBufBridge(b Bridge) *pb.Bridge {
 
 // ToBridge converts the specified protocol buffers bridge value and marshals it
 // into a bridge value.
-func ToBridge(pb *pb.Bridge) Bridge {
+func ToBridge(proxy *proxy.Bridge) Bridge {
 	return Bridge{
-		LocalPort:  pb.Localport,
-		LocalHost:  pb.Localaddr,
-		RemotePort: pb.Remoteport,
-		RemoteHost: pb.Remoteaddr,
-		Proto:      pb.Proto,
-		Name:       pb.Name,
-		Direction:  pb.Direction,
-		Auto:       pb.Auto,
+		LocalPort:  proxy.Localport,
+		LocalHost:  proxy.Localaddr,
+		RemotePort: proxy.Remoteport,
+		RemoteHost: proxy.Remoteaddr,
+		Proto:      proxy.Proto,
+		Name:       proxy.Name,
+		Direction:  proxy.Direction,
+		Auto:       proxy.Auto,
 	}
 }
 

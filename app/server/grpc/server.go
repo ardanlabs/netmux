@@ -5,50 +5,50 @@ import (
 	"net"
 	"time"
 
+	"github.com/ardanlabs.com/netmux/app/server/auth"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/foundation/db"
+	"github.com/ardanlabs.com/netmux/foundation/signal"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/server/auth"
-	"go.digitalcircle.com.br/dc/netmux/foundation/db"
-	"go.digitalcircle.com.br/dc/netmux/foundation/signal"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"google.golang.org/grpc"
 )
 
 type server struct {
-	pb.UnsafeNXProxyServer
-	eps      *db.DB[*pb.Bridge]
+	proxy.UnsafeProxyServer
+	eps      *db.DB[*proxy.Bridge]
 	sessions *db.DB[string]
 	conns    *db.DB[net.Conn]
-	signal   *signal.Signal[*pb.Bridge]
+	signal   *signal.Signal[*proxy.Bridge]
 }
 
 func (s server) mustEmbedUnimplementedServerServiceServer() {
 
 }
 
-func (s server) Ver(_ context.Context, _ *pb.Noop) (*pb.Noop, error) {
-	return &pb.Noop{}, nil
+func (s server) Ver(_ context.Context, _ *proxy.Noop) (*proxy.Noop, error) {
+	return &proxy.Noop{}, nil
 }
 
-func (s server) Login(ctx context.Context, req *pb.LoginReq) (*pb.StringMsg, error) {
+func (s server) Login(ctx context.Context, req *proxy.LoginReq) (*proxy.StringMsg, error) {
 	logrus.Warnf("Will auth: %#v", req)
 
 	str, err := auth.Login(req.User, req.Pass)
 
-	return &pb.StringMsg{Msg: str}, err
+	return &proxy.StringMsg{Msg: str}, err
 }
 
-func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) Logout(ctx context.Context, req *proxy.StringMsg) (*proxy.Noop, error) {
 	err := auth.Logout(req.Msg)
-	return &pb.Noop{}, err
+	return &proxy.Noop{}, err
 }
 
-func (s server) GetConfigs(ctx context.Context, req *pb.Noop) (*pb.Bridges, error) {
-	ret := &pb.Bridges{Eps: s.eps.KeyValues().Values()}
+func (s server) GetConfigs(ctx context.Context, req *proxy.Noop) (*proxy.Bridges, error) {
+	ret := &proxy.Bridges{Eps: s.eps.KeyValues().Values()}
 	return ret, nil
 }
 
-func (s server) StreamConfig(req *pb.Noop, server pb.NXProxy_StreamConfigServer) error {
-	brds := pb.Bridges{
+func (s server) StreamConfig(req *proxy.Noop, server proxy.Proxy_StreamConfigServer) error {
+	brds := proxy.Bridges{
 		Eps: s.eps.KeyValues().Values(),
 	}
 
@@ -71,8 +71,8 @@ func (s server) StreamConfig(req *pb.Noop, server pb.NXProxy_StreamConfigServer)
 		eps := <-ch
 		logrus.Tracef("got cfg")
 
-		brds := pb.Bridges{
-			Eps: []*pb.Bridge{eps},
+		brds := proxy.Bridges{
+			Eps: []*proxy.Bridge{eps},
 		}
 
 		if err := server.Send(&brds); err != nil {
@@ -81,18 +81,18 @@ func (s server) StreamConfig(req *pb.Noop, server pb.NXProxy_StreamConfigServer)
 	}
 }
 
-func (s server) KeepAlive(req *pb.Noop, res pb.NXProxy_KeepAliveServer) error {
+func (s server) KeepAlive(req *proxy.Noop, res proxy.Proxy_KeepAliveServer) error {
 	for {
-		res.Send(&pb.StringMsg{Msg: "PING"})
+		res.Send(&proxy.StringMsg{Msg: "PING"})
 		time.Sleep(time.Second)
 	}
 }
 
 var aServer = server{
-	eps:      db.New[*pb.Bridge](db.NopReadWriter{}),
+	eps:      db.New[*proxy.Bridge](db.NopReadWriter{}),
 	sessions: db.New[string](db.NopReadWriter{}),
 	conns:    db.New[net.Conn](db.NopReadWriter{}),
-	signal:   signal.New[*pb.Bridge](),
+	signal:   signal.New[*proxy.Bridge](),
 }
 
 func Run() error {
@@ -106,6 +106,6 @@ func Run() error {
 		grpc.UnaryInterceptor(authUnaryServerInterceptor()),
 		grpc.StreamInterceptor(authStreamServerInterceptor()),
 	)
-	pb.RegisterNXProxyServer(grpcServer, Server())
+	proxy.RegisterProxyServer(grpcServer, Server())
 	return grpcServer.Serve(l)
 }

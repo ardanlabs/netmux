@@ -1,14 +1,14 @@
 package grpc
 
 import (
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
 	"github.com/sirupsen/logrus"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
-func (s *server) propagate(brd *pb.Bridge) {
+func (s *server) propagate(brd *proxy.Bridge) {
 	logrus.Infof("Actual data:")
 
-	s.eps.ForEach(func(k string, brd *pb.Bridge) error {
+	s.eps.ForEach(func(k string, brd *proxy.Bridge) error {
 		logrus.Infof("%s => %s", k, brd.String())
 		return nil
 	})
@@ -17,7 +17,7 @@ func (s *server) propagate(brd *pb.Bridge) {
 	s.signal.Broadcast(brd)
 }
 
-func (s *server) AddEp(b *pb.Bridge) {
+func (s *server) AddEp(b *proxy.Bridge) {
 	b.Bridgeop = "A"
 	existing, _ := s.eps.Get(b.Name)
 	if existing != nil {
@@ -31,7 +31,7 @@ func (s *server) AddEp(b *pb.Bridge) {
 	s.eps.Set(b.Name, b)
 	s.propagate(b)
 }
-func (s *server) RemEp(b *pb.Bridge) {
+func (s *server) RemEp(b *proxy.Bridge) {
 	b.Bridgeop = "D"
 	existing, _ := s.eps.Get(b.Name)
 	if existing != nil {

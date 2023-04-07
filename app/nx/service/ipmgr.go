@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ardanlabs.com/netmux/foundation/shell"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
 )
 
 type IpMgr struct {

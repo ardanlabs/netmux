@@ -3,8 +3,8 @@ package cli
 import (
 	"os"
 
-	"go.digitalcircle.com.br/dc/netmux/app/nx/installer"
-	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
+	"github.com/ardanlabs.com/netmux/app/nx/installer"
+	"github.com/ardanlabs.com/netmux/foundation/shell"
 )
 
 func trayInstall() error {

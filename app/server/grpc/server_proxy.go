@@ -3,12 +3,12 @@ package grpc
 import (
 	"fmt"
 
+	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
-func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
+func (s server) Proxy(connectServer proxy.Proxy_ProxyServer) error {
 	co, err := connectServer.Recv()
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 				return
 			}
 
-			err = connectServer.Send(&pb.ConnIn{
+			err = connectServer.Send(&proxy.ConnIn{
 				Pl:  buf[:n],
 				Err: "",
 			})

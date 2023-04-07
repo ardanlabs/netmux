@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ardanlabs.com/netmux/app/server/auth"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/server/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )

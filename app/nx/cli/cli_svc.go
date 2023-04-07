@@ -2,7 +2,8 @@ package cli
 
 import (
 	"context"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
+
+	"github.com/ardanlabs.com/netmux/lib/proto/agent"
 )
 
 func svcOn() error {

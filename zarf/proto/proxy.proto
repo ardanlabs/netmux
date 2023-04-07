@@ -1,8 +1,8 @@
 syntax = "proto3";
-option go_package = "lib/proto/server";
+option go_package = "business/grpc/proxy";
 package proxy;
 
-service NXProxy {
+service Proxy {
   rpc Ver (Noop) returns (Noop) {}
   rpc Proxy (stream ConnOut) returns (stream ConnIn) {}
   rpc ReverseProxyListen (stream ConnOut) returns (stream RevProxyRequest) {}
@@ -11,11 +11,8 @@ service NXProxy {
   rpc PortScan(StringMsg) returns(StringMsg){}
   rpc Nc(StringMsg) returns(StringMsg){}
   rpc SpeedTest(StringMsg) returns(BytesMsg){}
-
   rpc KeepAlive(Noop) returns(stream StringMsg){}
-
   rpc GetConfigs(Noop) returns(Bridges){}
-
   rpc Login(LoginReq) returns(StringMsg){}
   rpc Logout(StringMsg) returns(Noop){}
 }
@@ -70,6 +67,7 @@ message ConnOut {
   optional Bridge bridge = 1;
   bytes pl = 2;
 }
+
 message ConnIn {
   bytes pl = 1;
   string err = 2;
@@ -83,6 +81,7 @@ message RevProxyConnIn {
   string connId = 1;
   bytes pl = 2;
 }
+
 message RevProxyConnOut {
   bytes pl = 1;
   string err = 2;

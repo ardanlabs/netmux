@@ -1,6 +1,7 @@
 syntax = "proto3";
-option go_package = "lib/proto/agent";
+option go_package = "business/grpc/agent";
 package agent;
+
 service Agent {
   rpc SetConfig(StringMsg) returns(Noop){}
   rpc GetConfig(Noop) returns(StringMsg){}

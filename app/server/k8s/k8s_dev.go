@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ardanlabs.com/netmux/app/server/grpc"
+	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/server/grpc"
-	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -101,7 +101,7 @@ func runNamespaceDevSimpleNS(ctx context.Context, cli *kubernetes.Clientset, ns 
 				}
 			}
 		} else if dep.Annotations["nx"] == "" && all {
-			ep := &pb.Bridge{}
+			ep := &proxy.Bridge{}
 			ep.Name = dep.Name
 			ep.Remoteaddr = dep.Spec.ClusterIP
 			ep.Remoteport = fmt.Sprintf("%v", dep.Spec.Ports[0].Port)

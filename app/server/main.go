@@ -5,9 +5,9 @@ import (
 	_ "embed"
 	"os"
 
+	"github.com/ardanlabs.com/netmux/app/server/grpc"
+	"github.com/ardanlabs.com/netmux/app/server/k8s"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/server/grpc"
-	"go.digitalcircle.com.br/dc/netmux/app/server/k8s"
 )
 
 //go:embed version

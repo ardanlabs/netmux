@@ -9,16 +9,16 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/ardanlabs.com/netmux/app/nx/cli/monitor"
+	"github.com/ardanlabs.com/netmux/app/nx/cli/tray"
+	"github.com/ardanlabs.com/netmux/app/nx/cli/webview"
+	"github.com/ardanlabs.com/netmux/app/nx/installer"
+	"github.com/ardanlabs.com/netmux/app/nx/service"
+	"github.com/ardanlabs.com/netmux/foundation/hash"
+	"github.com/ardanlabs.com/netmux/lib/proto/agent"
 	"github.com/hpcloud/tail"
 	"github.com/rodaine/table"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/cli/monitor"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/cli/tray"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/cli/webview"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/installer"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/foundation/hash"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 func newClient() (agent.AgentClient, error) {

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/foundation/hosts"
+	"github.com/ardanlabs.com/netmux/foundation/shell"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/foundation/bridge"
-	"go.digitalcircle.com.br/dc/netmux/foundation/hosts"
-	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
 type Service struct {
@@ -204,7 +204,7 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 		return err
 	}
 
-	err = proxyStream.Send(&pb.ConnOut{
+	err = proxyStream.Send(&proxy.ConnOut{
 		Bridge: bridge.ToProtoBufBridge(s.Bridge),
 		Pl:     nil,
 	})
@@ -231,7 +231,7 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 				return
 			}
 
-			err = proxyStream.Send(&pb.ConnOut{
+			err = proxyStream.Send(&proxy.ConnOut{
 				Pl: buf[:n],
 			})
 			if err != nil {
@@ -287,7 +287,7 @@ func (s *Service) StartReverseServiceGrpc(chErr chan error) {
 		return
 	}
 
-	err = lcli.Send(&pb.ConnOut{Bridge: bridge.ToProtoBufBridge(s.Bridge)})
+	err = lcli.Send(&proxy.ConnOut{Bridge: bridge.ToProtoBufBridge(s.Bridge)})
 	if err != nil {
 		logrus.Warnf("Error opening remote rev proxy listener conn %s: %s", s.Name(), err.Error())
 		chErr <- err
@@ -326,7 +326,7 @@ func (s *Service) handleDataConnGrpc(id string) {
 		return
 	}
 
-	err = rpw.Send(&pb.RevProxyConnIn{
+	err = rpw.Send(&proxy.RevProxyConnIn{
 		ConnId: id,
 		Pl:     nil,
 	})
@@ -345,7 +345,7 @@ func (s *Service) handleDataConnGrpc(id string) {
 			c.Close()
 			return
 		}
-		err = rpw.Send(&pb.RevProxyConnIn{
+		err = rpw.Send(&proxy.RevProxyConnIn{
 			ConnId: id,
 			Pl:     buf[:n],
 		})

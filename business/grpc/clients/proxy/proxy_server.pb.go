@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.28.1
 // 	protoc        v3.21.5
-// source: misc/proto/service_server.proto
+// source: misc/proto/proxy.proto
 
-package server
+package proxy
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"

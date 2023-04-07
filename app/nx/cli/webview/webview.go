@@ -2,10 +2,11 @@ package webview
 
 import (
 	"context"
+	"time"
+
+	"github.com/ardanlabs.com/netmux/lib/proto/agent"
 	"github.com/sirupsen/logrus"
 	"github.com/webview/webview"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
-	"time"
 )
 
 type jsResponse struct {

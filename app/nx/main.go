@@ -3,9 +3,9 @@ package main
 import (
 	_ "embed"
 
+	"github.com/ardanlabs.com/netmux/app/nx/cli"
+	"github.com/ardanlabs.com/netmux/app/nx/service"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/cli"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
 )
 
 //go:embed version

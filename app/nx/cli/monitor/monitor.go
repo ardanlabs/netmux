@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ardanlabs.com/netmux/app/nx/service"
+	"github.com/ardanlabs.com/netmux/lib/proto/agent"
 	"github.com/dustin/go-humanize"
 	"github.com/gdamore/tcell/v2"
 	"github.com/hpcloud/tail"
 	"github.com/rivo/tview"
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/app/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 func renderTable(tb *tview.Table, cfg *service.Netmux) int {

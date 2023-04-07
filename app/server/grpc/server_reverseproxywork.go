@@ -3,11 +3,11 @@ package grpc
 import (
 	"fmt"
 
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
 	"github.com/sirupsen/logrus"
-	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
-func (s server) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) error {
+func (s server) ReverseProxyWork(req proxy.Proxy_ReverseProxyWorkServer) error {
 	var err error
 	defer func() {
 		if err != nil {
@@ -42,7 +42,7 @@ func (s server) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) error {
 				chErr <- err
 				return
 			}
-			err = req.Send(&pb.RevProxyConnOut{
+			err = req.Send(&proxy.RevProxyConnOut{
 				Pl: buf[:n],
 			})
 			if err != nil {

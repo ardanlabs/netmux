@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"go.digitalcircle.com.br/dc/netmux/foundation/hash"
+	"github.com/ardanlabs.com/netmux/foundation/hash"
 )
 
 func getPassHash() string {
