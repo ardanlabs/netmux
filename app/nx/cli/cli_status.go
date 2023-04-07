@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/ardanlabs.com/netmux/lib/proto/agent"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/dustin/go-humanize"
 	"github.com/rodaine/table"
 )
@@ -31,9 +31,9 @@ func statusOnce() error {
 		return fmt.Errorf("newClient: %w", err)
 	}
 
-	var req = &pb.StringMsg{Msg: ""}
+	var req = &agent.StringMsg{Msg: ""}
 	if opts.Status.Zero {
-		req = &pb.StringMsg{Msg: "zero"}
+		req = &agent.StringMsg{Msg: "zero"}
 	}
 	res, err := cli.Status(context.Background(), req)
 	if err != nil {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ardanlabs.com/netmux/lib/proto/agent"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/sirupsen/logrus"
 	"github.com/webview/webview"
 )
@@ -19,7 +19,7 @@ var _cli agent.AgentClient
 func aCli() agent.AgentClient {
 	if _cli == nil {
 		var err error
-		_cli, err = agent.NewUnixDefault("", "")
+		_cli, err = agent.New("", "")
 		if err != nil {
 			_cli = nil
 			logrus.Warnf(err.Error())

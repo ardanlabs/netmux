@@ -14,15 +14,15 @@ import (
 	"github.com/ardanlabs.com/netmux/app/nx/cli/webview"
 	"github.com/ardanlabs.com/netmux/app/nx/installer"
 	"github.com/ardanlabs.com/netmux/app/nx/service"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/ardanlabs.com/netmux/foundation/hash"
-	"github.com/ardanlabs.com/netmux/lib/proto/agent"
 	"github.com/hpcloud/tail"
 	"github.com/rodaine/table"
 	"github.com/sirupsen/logrus"
 )
 
 func newClient() (agent.AgentClient, error) {
-	return agent.NewUnixDefault(opts.User, opts.Pass)
+	return agent.New(opts.User, opts.Pass)
 }
 
 func start() error {

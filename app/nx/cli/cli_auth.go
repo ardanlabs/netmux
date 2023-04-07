@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/ardanlabs.com/netmux/lib/proto/agent"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 )
 
 func ctxLogin() error {

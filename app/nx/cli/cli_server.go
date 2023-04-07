@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/ardanlabs.com/netmux/app/nx/grpc"
-	"github.com/ardanlabs.com/netmux/lib/proto/agent"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 )
 
 func server() error {

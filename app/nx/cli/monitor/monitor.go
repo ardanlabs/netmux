@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ardanlabs.com/netmux/app/nx/service"
-	"github.com/ardanlabs.com/netmux/lib/proto/agent"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/dustin/go-humanize"
 	"github.com/gdamore/tcell/v2"
 	"github.com/hpcloud/tail"

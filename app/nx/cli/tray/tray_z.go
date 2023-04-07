@@ -14,7 +14,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/driver/desktop"
-	"github.com/ardanlabs.com/netmux/lib/proto/agent"
+	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/gen2brain/beeep"
 	"github.com/sirupsen/logrus"
 )
@@ -31,7 +31,7 @@ const (
 var logo []byte
 
 func newClient() (agent.AgentClient, error) {
-	return agent.NewUnixDefault("", "")
+	return agent.New("", "")
 }
 
 func wError(a fyne.App, err string) {
