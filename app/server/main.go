@@ -113,7 +113,7 @@ func run(log *logrus.Logger) error {
 	}
 
 	// =========================================================================
-	// Start Server
+	// Start Services
 
 	proxy, err := proxy.Start(log)
 	if err != nil {
@@ -126,7 +126,7 @@ func run(log *logrus.Logger) error {
 	}
 
 	// =========================================================================
-	// Stop Server
+	// Stop Services
 
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
