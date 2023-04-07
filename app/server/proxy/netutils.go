@@ -1,4 +1,4 @@
-package grpc
+package proxy
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (*Server) Ping(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, error) {
+func (s *Proxy) Ping(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, error) {
 	ret, err := shell.Ping(req.Msg)
 	if err != nil {
 		return nil, err
@@ -18,7 +18,7 @@ func (*Server) Ping(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, 
 	return &proxy.StringMsg{Msg: ret}, nil
 }
 
-func (*Server) PortScan(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, error) {
+func (s *Proxy) PortScan(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, error) {
 	ret, err := shell.Nmap(req.Msg)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func (*Server) PortScan(_ context.Context, req *proxy.StringMsg) (*proxy.StringM
 	return &proxy.StringMsg{Msg: ret}, nil
 }
 
-func (*Server) Nc(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, error) {
+func (s *Proxy) Nc(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, error) {
 	ret, err := shell.Nc(req.Msg) //cmd.Nc(req.Msg)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (*Server) Nc(_ context.Context, req *proxy.StringMsg) (*proxy.StringMsg, er
 	return &proxy.StringMsg{Msg: ret}, nil
 }
 
-func (*Server) SpeedTest(ctx context.Context, req *proxy.StringMsg) (*proxy.BytesMsg, error) {
+func (s *Proxy) SpeedTest(ctx context.Context, req *proxy.StringMsg) (*proxy.BytesMsg, error) {
 	sz, err := humanize.ParseBytes(req.Msg)
 	if err != nil {
 		return nil, err

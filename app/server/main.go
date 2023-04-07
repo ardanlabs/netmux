@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/ardanlabs.com/netmux/app/server/grpc"
-	"github.com/ardanlabs.com/netmux/app/server/k8s"
+	"github.com/ardanlabs.com/netmux/app/server/monitor"
+	"github.com/ardanlabs.com/netmux/app/server/proxy"
 	"github.com/ardanlabs/conf/v3"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -90,23 +90,23 @@ func run(log *logrus.Logger) error {
 	// =========================================================================
 	// K8s Configuration
 
-	var k8sCfg k8s.Config
+	var mntCfg monitor.Config
 	switch cfg.Server.Mode {
 	case "dev":
-		k8sCfg = k8s.Config{
+		mntCfg = monitor.Config{
 			//Kubefile:   "~/.kube/k8s.yaml",
-			Namespaces: []string{k8s.Namespace()},
+			Namespaces: []string{monitor.Namespace()},
 		}
 
 	case "dev-all":
-		k8sCfg = k8s.Config{
+		mntCfg = monitor.Config{
 			//Kubefile:   "~/.kube/k8s.yaml",
-			Namespaces:  []string{k8s.Namespace()},
+			Namespaces:  []string{monitor.Namespace()},
 			AllServices: true,
 		}
 
 	default:
-		k8sCfg = k8s.Config{
+		mntCfg = monitor.Config{
 			//Kubefile:   "~/.kube/k8s.yaml",
 			Namespaces: []string{cfg.Server.Namespace},
 		}
@@ -115,12 +115,12 @@ func run(log *logrus.Logger) error {
 	// =========================================================================
 	// Start Server
 
-	server, err := grpc.Start(log)
+	proxy, err := proxy.Start(log)
 	if err != nil {
 		log.Infof("grpc.Start: %w", err)
 	}
 
-	k8s, err := k8s.Start(log, server, k8sCfg)
+	monitor, err := monitor.Start(log, proxy, mntCfg)
 	if err != nil {
 		log.Infof("main: k8s.Start: mode[%s]: %w", cfg.Server.Mode, err)
 	}
@@ -132,8 +132,8 @@ func run(log *logrus.Logger) error {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 	<-shutdown
 
-	k8s.Shutdown()
-	server.Shutdown()
+	monitor.Shutdown()
+	proxy.Shutdown()
 
 	return nil
 }
