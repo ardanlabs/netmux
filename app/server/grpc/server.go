@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/ardanlabs.com/netmux/app/server/auth"
@@ -13,23 +15,69 @@ import (
 	"google.golang.org/grpc"
 )
 
-type server struct {
+type Server struct {
 	proxy.UnsafeProxyServer
+	log      *logrus.Logger
 	eps      *db.DB[*proxy.Bridge]
 	sessions *db.DB[string]
 	conns    *db.DB[net.Conn]
 	signal   *signal.Signal[*proxy.Bridge]
+	grpc     *grpc.Server
+	wg       sync.WaitGroup
 }
 
-func (s server) mustEmbedUnimplementedServerServiceServer() {
+func Start(log *logrus.Logger) (*Server, error) {
+	server := Server{
+		log:      log,
+		eps:      db.New[*proxy.Bridge](db.NopReadWriter{}),
+		sessions: db.New[string](db.NopReadWriter{}),
+		conns:    db.New[net.Conn](db.NopReadWriter{}),
+		signal:   signal.New[*proxy.Bridge](),
+		grpc: grpc.NewServer(
+			grpc.UnaryInterceptor(authUnaryServerInterceptor()),
+			grpc.StreamInterceptor(authStreamServerInterceptor()),
+		),
+	}
+
+	proxy.RegisterProxyServer(server.grpc, &server)
+
+	l, err := net.Listen("tcp", "0.0.0.0:48080")
+	if err != nil {
+		return nil, fmt.Errorf("net.Listen: %w", err)
+	}
+
+	server.wg.Add(1)
+
+	go func() {
+		log.Info("server: started")
+		defer func() {
+			log.Info("server: shutdown")
+			server.wg.Done()
+		}()
+
+		server.log.Infof("server: running server at 0.0.0.0:48080")
+		server.grpc.Serve(l)
+	}()
+
+	return &server, nil
+}
+
+func (s *Server) Shutdown() {
+	s.log.Infof("server: starting shutdown")
+	defer s.log.Infof("server: shutdown")
+
+	s.grpc.GracefulStop()
+}
+
+func (s *Server) mustEmbedUnimplementedServerServiceServer() {
 
 }
 
-func (s server) Ver(_ context.Context, _ *proxy.Noop) (*proxy.Noop, error) {
+func (s *Server) Ver(_ context.Context, _ *proxy.Noop) (*proxy.Noop, error) {
 	return &proxy.Noop{}, nil
 }
 
-func (s server) Login(ctx context.Context, req *proxy.LoginReq) (*proxy.StringMsg, error) {
+func (s *Server) Login(ctx context.Context, req *proxy.LoginReq) (*proxy.StringMsg, error) {
 	logrus.Warnf("Will auth: %#v", req)
 
 	str, err := auth.Login(req.User, req.Pass)
@@ -37,17 +85,17 @@ func (s server) Login(ctx context.Context, req *proxy.LoginReq) (*proxy.StringMs
 	return &proxy.StringMsg{Msg: str}, err
 }
 
-func (s server) Logout(ctx context.Context, req *proxy.StringMsg) (*proxy.Noop, error) {
+func (s *Server) Logout(ctx context.Context, req *proxy.StringMsg) (*proxy.Noop, error) {
 	err := auth.Logout(req.Msg)
 	return &proxy.Noop{}, err
 }
 
-func (s server) GetConfigs(ctx context.Context, req *proxy.Noop) (*proxy.Bridges, error) {
+func (s *Server) GetConfigs(ctx context.Context, req *proxy.Noop) (*proxy.Bridges, error) {
 	ret := &proxy.Bridges{Eps: s.eps.KeyValues().Values()}
 	return ret, nil
 }
 
-func (s server) StreamConfig(req *proxy.Noop, server proxy.Proxy_StreamConfigServer) error {
+func (s *Server) StreamConfig(req *proxy.Noop, server proxy.Proxy_StreamConfigServer) error {
 	brds := proxy.Bridges{
 		Eps: s.eps.KeyValues().Values(),
 	}
@@ -81,31 +129,9 @@ func (s server) StreamConfig(req *proxy.Noop, server proxy.Proxy_StreamConfigSer
 	}
 }
 
-func (s server) KeepAlive(req *proxy.Noop, res proxy.Proxy_KeepAliveServer) error {
+func (s *Server) KeepAlive(req *proxy.Noop, res proxy.Proxy_KeepAliveServer) error {
 	for {
 		res.Send(&proxy.StringMsg{Msg: "PING"})
 		time.Sleep(time.Second)
 	}
-}
-
-var aServer = server{
-	eps:      db.New[*proxy.Bridge](db.NopReadWriter{}),
-	sessions: db.New[string](db.NopReadWriter{}),
-	conns:    db.New[net.Conn](db.NopReadWriter{}),
-	signal:   signal.New[*proxy.Bridge](),
-}
-
-func Run() error {
-	logrus.Infof("Running server at 0.0.0.0:48080")
-	l, err := net.Listen("tcp", "0.0.0.0:48080")
-	if err != nil {
-		return err
-	}
-
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(authUnaryServerInterceptor()),
-		grpc.StreamInterceptor(authStreamServerInterceptor()),
-	)
-	proxy.RegisterProxyServer(grpcServer, Server())
-	return grpcServer.Serve(l)
 }

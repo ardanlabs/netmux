@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s server) ReverseProxyListen(req proxy.Proxy_ReverseProxyListenServer) error {
+func (s *Server) ReverseProxyListen(req proxy.Proxy_ReverseProxyListenServer) error {
 	var in *proxy.ConnOut
 	var err error
 	var l net.Listener

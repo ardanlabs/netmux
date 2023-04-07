@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s server) Proxy(connectServer proxy.Proxy_ProxyServer) error {
+func (s *Server) Proxy(connectServer proxy.Proxy_ProxyServer) error {
 	co, err := connectServer.Recv()
 	if err != nil {
 		return err

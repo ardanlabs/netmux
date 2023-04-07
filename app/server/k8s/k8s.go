@@ -1,11 +1,15 @@
+// package k8s provides support for connecting, watching and creating abstractions
+// in kubernetes.
 package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/ardanlabs.com/netmux/app/server/grpc"
 	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
@@ -20,348 +24,432 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func resolveConfig(fname string) (*rest.Config, error) {
-
-	if fname != "" {
-		if fname == "~" {
-
-			userHomeDir, err := os.UserHomeDir()
-			if err != nil {
-				fmt.Printf("error getting user home dir: %v\n", err)
-				return nil, err
-			}
-			fname = filepath.Join(userHomeDir, ".kube", "config")
-			fmt.Printf("Using kubeconfig: %s\n", fname)
-
-		} else {
-			if strings.HasPrefix(fname, "~") {
-				userHomeDir, err := os.UserHomeDir()
-				if err != nil {
-					fmt.Printf("error getting user home dir: %v\n", err)
-					return nil, err
-				}
-				fname = fname[2:]
-				fname = filepath.Join(userHomeDir, fname)
-			}
-			fmt.Printf("Using kubeconfig: %s\n", fname)
-		}
-		return clientcmd.BuildConfigFromFlags("", fname)
+// Namespace reads the k8s namespace file if it exists.
+func Namespace() string {
+	ns, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return ""
 	}
-	logrus.Infof("Using InClusterConfig")
+
+	return string(ns)
+}
+
+// =============================================================================
+
+// Config represents settings needed to start the monitor.
+type Config struct {
+	KubeFile    string
+	Namespaces  []string
+	AllServices bool
+}
+
+// K8s represents an API for working with Kubernetes.
+type K8s struct {
+	log      *logrus.Logger
+	server   *grpc.Server
+	wg       sync.WaitGroup
+	shutdown context.CancelFunc
+}
+
+// Start starts the k8s support for connecting, watching and creating abstractions
+// in kubernetes.
+func Start(log *logrus.Logger, server *grpc.Server, cfg Config) (*K8s, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	k8s := K8s{
+		log:      log,
+		server:   server,
+		shutdown: cancel,
+	}
+
+	restCfg, err := resolveConfig(log, cfg.KubeFile)
+	if err != nil {
+		return nil, fmt.Errorf("resolveConfig: %w", err)
+	}
+
+	log.Infof("k8s: username %q", restCfg.Username)
+
+	clientSet, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes.NewForConfig: %w", err)
+	}
+
+	k8s.wg.Add(len(cfg.Namespaces))
+
+	for _, ns := range cfg.Namespaces {
+		go func(namespace string) {
+			log.Infof("k8s: monitor: started: %q", namespace)
+			defer func() {
+				log.Infof("k8s: monitor: shutdown: %q", namespace)
+				k8s.wg.Done()
+			}()
+
+			if err := monitor(ctx, log, server, clientSet, namespace, cfg.AllServices); err != nil {
+				log.Infof("k8s: monitor: ERROR: %w", err)
+			}
+		}(ns)
+	}
+
+	return &k8s, nil
+}
+
+// Shutdown will request all the monitoring G's to shutdown and will wait for
+// that to happen.
+func (k8s *K8s) Shutdown() {
+	k8s.shutdown()
+	k8s.wg.Done()
+}
+
+// =============================================================================
+
+func resolveConfig(log *logrus.Logger, kubeFile string) (*rest.Config, error) {
+	if kubeFile != "" {
+		userHomeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("error getting user home dir: %w", err)
+		}
+
+		switch {
+		case kubeFile == "~":
+			kubeFile = filepath.Join(userHomeDir, ".kube", "config")
+
+		case strings.HasPrefix(kubeFile, "~"):
+			if len(kubeFile) < 3 {
+				return nil, fmt.Errorf("invalid kubeFile %q: %w", kubeFile, err)
+			}
+
+			kubeFile = kubeFile[2:]
+			kubeFile = filepath.Join(userHomeDir, kubeFile)
+		}
+
+		log.Infof("k8s: resolveConfig: using BuildConfigFromFlags %s", kubeFile)
+		return clientcmd.BuildConfigFromFlags("", kubeFile)
+	}
+
+	log.Infof("k8s: resolveConfig: using InClusterConfig")
 	return rest.InClusterConfig()
 }
 
-type Opts struct {
-	Kubefile   string
-	Namespaces []string
-	All        bool
+func monitor(ctx context.Context, log *logrus.Logger, server *grpc.Server, clientSet *kubernetes.Clientset, namespace string, allServices bool) error {
+	log.Infof("k8s: monitor: started")
+	defer log.Infof("k8s: monitor: shutdown")
+
+	pods, err := clientSet.CoreV1().Pods(namespace).Watch(ctx, v1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("pods.watch: namespace[%s]: %w", namespace, err)
+	}
+
+	services, err := clientSet.CoreV1().Services(namespace).Watch(ctx, v1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("services.watch: namespace[%s]: %w", namespace, err)
+	}
+
+	deployments, err := clientSet.AppsV1().Deployments(namespace).Watch(ctx, v1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("deployments.watch: namespace[%s]: %w", namespace, err)
+	}
+
+	statefulSets, err := clientSet.AppsV1().StatefulSets(namespace).Watch(ctx, v1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("statefulsets.watch: namespace[%s]: %w", namespace, err)
+	}
+
+	h := handlers{
+		log:    log,
+		server: server,
+	}
+
+	for {
+		select {
+		case x := <-pods.ResultChan():
+			pod, ok := x.Object.(*corev1.Pod)
+			if ok && pod != nil {
+				h.pod(ctx, x.Type, pod)
+			}
+
+		case x := <-services.ResultChan():
+			service, ok := x.Object.(*corev1.Service)
+			if ok && service != nil {
+				h.service(ctx, x.Type, service, allServices)
+			}
+
+		case x := <-deployments.ResultChan():
+			deployment, ok := x.Object.(*appv1.Deployment)
+			if ok && deployment != nil {
+				h.deployment(ctx, x.Type, deployment)
+			}
+
+		case x := <-statefulSets.ResultChan():
+			statefulSet, ok := x.Object.(*appv1.StatefulSet)
+			if ok && statefulSet != nil {
+				h.statefulSets(ctx, x.Type, statefulSet)
+			}
+
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
 
-func MyNamespace() (string, error) {
-	bs, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		return "", err
-	}
-	return string(bs), nil
+// =============================================================================
+
+type handlers struct {
+	log    *logrus.Logger
+	server *grpc.Server
 }
 
-func runNamespace(ctx context.Context, cli *kubernetes.Clientset, ns string) error {
-
-	logrus.Infof("K8s monigoring: %s", ns)
-
-	handlePod := func(evt watch.EventType, dep *corev1.Pod) {
-
-		if dep.Annotations["nx"] != "" {
-			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
-			if err != nil {
-				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
-				return
-			}
-			for i := range nxas {
-				nxa := nxas[i]
-				if nxa.RemoteHost == "" {
-					nxa.RemoteHost = dep.Status.PodIP
-				}
-
-				if nxa.RemotePort == "" {
-					nxa.RemotePort = fmt.Sprintf("%v", dep.Spec.Containers[0].Ports[0].ContainerPort)
-				}
-
-				ep := bridge.ToProtoBufBridge(nxa)
-				ep.K8Snamespace = dep.Namespace
-				ep.K8Sname = dep.Name
-				ep.K8Skind = dep.Kind
-
-				switch evt {
-				case watch.Added:
-					grpc.Server().AddEp(ep)
-				case watch.Deleted:
-					grpc.Server().RemEp(ep)
-				case watch.Modified:
-					grpc.Server().AddEp(ep)
-				}
-			}
-		}
+func (h *handlers) pod(ctx context.Context, evtType watch.EventType, pod *corev1.Pod) error {
+	if pod.Annotations["nx"] == "" {
+		return nil
 	}
 
-	handleService := func(evt watch.EventType, dep *corev1.Service) {
-		if dep.Annotations["nx"] != "" {
-
-			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
-			if err != nil {
-				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
-				return
-			}
-			for i := range nxas {
-				nxa := nxas[i]
-				if nxa.Name == "" {
-					logrus.Warnf("Cant proceed w/o naming service: %s.%s", dep.Namespace, dep.Name)
-					return
-				}
-
-				if nxa.RemoteHost == "" {
-					nxa.RemoteHost = dep.Spec.ClusterIP
-				}
-
-				if nxa.RemotePort == "" {
-					nxa.RemotePort = fmt.Sprintf("%v", dep.Spec.Ports[0].Port)
-				}
-				if nxa.LocalPort == "" {
-					nxa.LocalPort = fmt.Sprintf("%v", dep.Spec.Ports[0].Port)
-					nxa.LocalPort = fmt.Sprintf("%v", dep.Spec.Ports[0].Port)
-					logrus.Warnf("Fixing w/o local port: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.Direction == "" {
-					nxa.Direction = bridge.DirectionReward
-				}
-
-				ep := bridge.ToProtoBufBridge(nxa)
-				ep.K8Snamespace = dep.Namespace
-				ep.K8Sname = dep.Name
-				ep.K8Skind = dep.Kind
-
-				switch evt {
-				case watch.Added:
-					grpc.Server().AddEp(ep)
-				case watch.Deleted:
-					grpc.Server().RemEp(ep)
-				case watch.Modified:
-					grpc.Server().AddEp(ep)
-				}
-			}
-		}
-	}
-
-	handleDeployments := func(evt watch.EventType, dep *appv1.Deployment) {
-		if dep.Annotations["nx"] != "" {
-
-			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
-			if err != nil {
-				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
-				return
-			}
-
-			for i := range nxas {
-				nxa := nxas[i]
-
-				if nxa.Name == "" {
-					logrus.Warnf("Fixing Name: %s.%s", dep.Namespace, dep.Name)
-					nxa.RemoteHost = dep.Name + "." + dep.Namespace
-
-				}
-
-				if nxa.RemoteHost == "" {
-					nxa.RemoteHost = dep.Name + "." + dep.Namespace
-					logrus.Warnf("Fixing remote addr: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.LocalHost == "" {
-					nxa.LocalHost = dep.Name + "." + dep.Namespace
-					logrus.Warnf("Fixing local addr: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.RemotePort == "" {
-					nxa.RemotePort = fmt.Sprintf("%v", dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
-					logrus.Warnf("Fixing w/o remote port: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.LocalPort == "" {
-					nxa.LocalPort = fmt.Sprintf("%v", dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
-					logrus.Warnf("Fixing w/o local port: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.Direction == "" {
-					nxa.Direction = bridge.DirectionForward
-				}
-
-				ep := bridge.ToProtoBufBridge(nxa)
-				ep.K8Snamespace = dep.Namespace
-				ep.K8Sname = dep.Name
-				ep.K8Skind = dep.Kind
-
-				switch evt {
-				case watch.Added:
-					grpc.Server().AddEp(ep)
-				case watch.Deleted:
-					grpc.Server().RemEp(ep)
-				case watch.Modified:
-					grpc.Server().AddEp(ep)
-				}
-			}
-		}
-	}
-
-	handleStatefulSets := func(evt watch.EventType, dep *appv1.StatefulSet) {
-		if dep.Annotations["nx"] != "" {
-			nxas, err := bridge.LoadBridges(dep.Annotations["nx"])
-			if err != nil {
-				logrus.Warnf("error reading annotation for %s.%s: %s", dep.Name, dep.Namespace, err.Error())
-				return
-			}
-
-			for i := range nxas {
-				nxa := nxas[i]
-
-				if nxa.Name == "" {
-					logrus.Warnf("Fixing Name: %s.%s", dep.Namespace, dep.Name)
-					nxa.RemoteHost = dep.Name + "." + dep.Namespace
-
-				}
-
-				if nxa.RemoteHost == "" {
-					nxa.RemoteHost = dep.Name + "." + dep.Namespace
-					logrus.Warnf("Fixing remote addr: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.LocalHost == "" {
-					nxa.LocalHost = dep.Name + "." + dep.Namespace
-					logrus.Warnf("Fixing local addr: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.RemotePort == "" {
-					nxa.RemotePort = fmt.Sprintf("%v", dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
-					logrus.Warnf("Fixing w/o remote port: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.LocalPort == "" {
-					nxa.LocalPort = fmt.Sprintf("%v", dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
-					logrus.Warnf("Fixing w/o local port: %s.%s", dep.Namespace, dep.Name)
-
-				}
-
-				if nxa.Direction == "" {
-					nxa.Direction = bridge.DirectionForward
-				}
-
-				ep := bridge.ToProtoBufBridge(nxa)
-				ep.K8Snamespace = dep.Namespace
-				ep.K8Sname = dep.Name
-				ep.K8Skind = dep.Kind
-
-				switch evt {
-				case watch.Added:
-					grpc.Server().AddEp(ep)
-				case watch.Deleted:
-					grpc.Server().RemEp(ep)
-				case watch.Modified:
-					grpc.Server().AddEp(ep)
-				}
-			}
-		}
-	}
-
-	logrus.Debugf("Loading resources")
-
-	wpods, err := cli.CoreV1().Pods(ns).Watch(ctx, v1.ListOptions{})
-
+	brds, err := bridge.LoadBridges(pod.Annotations["nx"])
 	if err != nil {
-		return err
+		return fmt.Errorf("reading annotation for name[%s] namespace[%s]: %w", pod.Name, pod.Namespace, err)
 	}
 
-	wservices, err := cli.CoreV1().Services(ns).Watch(ctx, v1.ListOptions{})
-	if err != nil {
-		return err
-	}
+	for i := range brds {
+		brd := brds[i]
 
-	wdeployments, err := cli.AppsV1().Deployments(ns).Watch(ctx, v1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	wstatefulsets, err := cli.AppsV1().StatefulSets(ns).Watch(ctx, v1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			select {
-			case x := <-wpods.ResultChan():
-				p, ok := x.Object.(*corev1.Pod)
-				if ok && p != nil {
-					handlePod(x.Type, x.Object.(*corev1.Pod))
-				}
-
-			case x := <-wservices.ResultChan():
-				p, ok := x.Object.(*corev1.Service)
-				if ok && p != nil {
-					handleService(x.Type, p)
-				}
-			case x := <-wdeployments.ResultChan():
-				p, ok := x.Object.(*appv1.Deployment)
-
-				if ok && p != nil {
-					handleDeployments(x.Type, p)
-				}
-			case x := <-wstatefulsets.ResultChan():
-				p, ok := x.Object.(*appv1.StatefulSet)
-
-				if ok && p != nil {
-					handleStatefulSets(x.Type, p)
-				}
-			case <-ctx.Done():
-				return
-			}
+		if brd.RemoteHost == "" {
+			brd.RemoteHost = pod.Status.PodIP
+			h.log.Infof("pod: updated RemoteHost: brd.RemoteHost[%s]", brd.RemoteHost)
 		}
-	}()
-	logrus.Debugf("Namespace monitoring on")
+
+		if brd.RemotePort == "" {
+			brd.RemotePort = fmt.Sprintf("%v", pod.Spec.Containers[0].Ports[0].ContainerPort)
+			h.log.Infof("pod: updated RemotePort: brd.RemotePort[%s]", brd.RemotePort)
+		}
+
+		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd.K8Snamespace = pod.Namespace
+		prxBrd.K8Sname = pod.Name
+		prxBrd.K8Skind = pod.Kind
+
+		switch evtType {
+		case watch.Added:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("pod: added proxy bridge: brd.Name[%s]", brd.Name)
+
+		case watch.Deleted:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("pod: delete proxy bridge: brd.Name[%s]", brd.Name)
+
+		case watch.Modified:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("pod: modified proxy bridge: brd.Name[%s]", brd.Name)
+		}
+	}
+
 	return nil
-
 }
 
-func Run(ctx context.Context, opts *Opts) error {
-	if opts == nil {
-		return fmt.Errorf("opts cant be nil")
+func (h *handlers) service(ctx context.Context, evtType watch.EventType, service *corev1.Service, all bool) error {
+	if service.Annotations["nx"] == "" && !all {
+		return nil
 	}
 
-	kubeConfig, err := resolveConfig(opts.Kubefile)
+	var brds bridge.Bridges
+	if service.Annotations["nx"] == "" {
+		if !all {
+			return nil
+		}
 
-	logrus.Infof("Running as: %s", kubeConfig.Username)
+		brd := bridge.Bridge{
+			Name:      service.Name,
+			Direction: bridge.DirectionForward,
+		}
 
-	if err != nil {
-		return err
+		brds = append(brds, brd)
 	}
-	clientset, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		return err
-	}
 
-	for _, v := range opts.Namespaces {
-		err = runNamespace(ctx, clientset, v)
+	if len(brds) == 0 {
+		var err error
+		brds, err = bridge.LoadBridges(service.Annotations["nx"])
 		if err != nil {
-			return err
+			return fmt.Errorf("reading annotation for name[%s] namespace[%s]: %w", service.Name, service.Namespace, err)
 		}
 	}
 
-	<-ctx.Done()
+	for i := range brds {
+		brd := brds[i]
+
+		if brd.Name == "" {
+			return errors.New("missing bridge name")
+		}
+
+		if brd.RemoteHost == "" {
+			brd.RemoteHost = service.Spec.ClusterIP
+			h.log.Infof("service: updated RemoteHost: brd.RemoteHost[%s]", brd.RemoteHost)
+		}
+
+		if brd.RemotePort == "" {
+			brd.RemotePort = fmt.Sprintf("%v", service.Spec.Ports[0].Port)
+			h.log.Infof("service: updated RemotePort: brd.RemotePort[%s]", brd.RemotePort)
+		}
+
+		if brd.LocalPort == "" {
+			brd.LocalPort = fmt.Sprintf("%v", service.Spec.Ports[0].Port)
+			h.log.Infof("service: updated LocalPort: brd.LocalPort[%s]", brd.LocalPort)
+		}
+
+		if brd.Direction == "" {
+			brd.Direction = bridge.DirectionReward
+			h.log.Infof("service: updated Direction: brd.Direction[%s]", brd.Direction)
+		}
+
+		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd.K8Snamespace = service.Namespace
+		prxBrd.K8Sname = service.Name
+		prxBrd.K8Skind = service.Kind
+
+		switch evtType {
+		case watch.Added:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("service: added proxy bridge: prxBrd.Name[%s]", prxBrd.Name)
+
+		case watch.Deleted:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("service: delete proxy bridge: prxBrd.Name[%s]", prxBrd.Name)
+
+		case watch.Modified:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("service: modified proxy bridge: prxBrd.Name[%s]", prxBrd.Name)
+		}
+	}
+
+	return nil
+}
+
+func (h *handlers) deployment(ctx context.Context, evtType watch.EventType, deployment *appv1.Deployment) error {
+	if deployment.Annotations["nx"] == "" {
+		return nil
+	}
+
+	brds, err := bridge.LoadBridges(deployment.Annotations["nx"])
+	if err != nil {
+		return fmt.Errorf("reading annotation for name[%s] namespace[%s]: %w", deployment.Name, deployment.Namespace, err)
+	}
+
+	for i := range brds {
+		brd := brds[i]
+
+		if brd.Name == "" {
+			brd.RemoteHost = fmt.Sprintf("%s.%s", deployment.Namespace, deployment.Name)
+			h.log.Infof("deployment: updated RemoteHost: brd.RemoteHost[%s]", brd.RemoteHost)
+		}
+
+		if brd.RemoteHost == "" {
+			brd.RemoteHost = fmt.Sprintf("%s.%s", deployment.Namespace, deployment.Name)
+			h.log.Infof("deployment: updated RemoteHost: brd.RemoteHost[%s]", brd.RemoteHost)
+		}
+
+		if brd.LocalHost == "" {
+			brd.LocalHost = fmt.Sprintf("%s.%s", deployment.Namespace, deployment.Name)
+			h.log.Infof("deployment: updated LocalHost: brd.LocalHost[%s]", brd.LocalHost)
+		}
+
+		if brd.RemotePort == "" {
+			brd.RemotePort = fmt.Sprintf("%v", deployment.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
+			h.log.Infof("deployment: updated RemotePort: brd.RemotePort[%s]", brd.RemotePort)
+		}
+
+		if brd.LocalPort == "" {
+			brd.LocalPort = fmt.Sprintf("%v", deployment.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
+			h.log.Infof("deployment: updated LocalPort: brd.LocalPort[%s]", brd.LocalPort)
+		}
+
+		if brd.Direction == "" {
+			brd.Direction = bridge.DirectionForward
+			h.log.Infof("deployment: updated Direction: brd.Direction[%s]", brd.Direction)
+		}
+
+		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd.K8Snamespace = deployment.Namespace
+		prxBrd.K8Sname = deployment.Name
+		prxBrd.K8Skind = deployment.Kind
+
+		switch evtType {
+		case watch.Added:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("deployment: added proxy bridge: brd.Name[%s]", brd.Name)
+
+		case watch.Deleted:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("deployment: delete proxy bridge: brd.Name[%s]", brd.Name)
+
+		case watch.Modified:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("deployment: modified proxy bridge: brd.Name[%s]", brd.Name)
+		}
+	}
+
+	return nil
+}
+
+func (h *handlers) statefulSets(ctx context.Context, evtType watch.EventType, statefulSet *appv1.StatefulSet) error {
+	if statefulSet.Annotations["nx"] == "" {
+		return nil
+	}
+
+	brds, err := bridge.LoadBridges(statefulSet.Annotations["nx"])
+	if err != nil {
+		return fmt.Errorf("reading annotation for name[%s] namespace[%s]: %w", statefulSet.Name, statefulSet.Namespace, err)
+	}
+
+	for i := range brds {
+		brd := brds[i]
+
+		if brd.Name == "" {
+			brd.RemoteHost = fmt.Sprintf("%s.%s", statefulSet.Namespace, statefulSet.Name)
+			h.log.Infof("statefulSets: updated RemoteHost: brd.RemoteHost[%s]", brd.RemoteHost)
+		}
+
+		if brd.RemoteHost == "" {
+			brd.RemoteHost = fmt.Sprintf("%s.%s", statefulSet.Namespace, statefulSet.Name)
+			h.log.Infof("statefulSets: updated RemoteHost: brd.RemoteHost[%s]", brd.RemoteHost)
+		}
+
+		if brd.LocalHost == "" {
+			brd.LocalHost = fmt.Sprintf("%s.%s", statefulSet.Namespace, statefulSet.Name)
+			h.log.Infof("statefulSets: updated LocalHost: brd.LocalHost[%s]", brd.LocalHost)
+		}
+
+		if brd.RemotePort == "" {
+			brd.RemotePort = fmt.Sprintf("%v", statefulSet.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
+			h.log.Infof("statefulSets: updated RemotePort: brd.RemotePort[%s]", brd.RemotePort)
+		}
+
+		if brd.LocalPort == "" {
+			brd.LocalPort = fmt.Sprintf("%v", statefulSet.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
+			h.log.Infof("statefulSets: updated LocalPort: brd.LocalPort[%s]", brd.LocalPort)
+		}
+
+		if brd.Direction == "" {
+			brd.Direction = bridge.DirectionForward
+			h.log.Infof("statefulSets: updated Direction: brd.Direction[%s]", brd.Direction)
+		}
+
+		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd.K8Snamespace = statefulSet.Namespace
+		prxBrd.K8Sname = statefulSet.Name
+		prxBrd.K8Skind = statefulSet.Kind
+
+		switch evtType {
+		case watch.Added:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("statefulSets: added proxy bridge: brd.Name[%s]", brd.Name)
+
+		case watch.Deleted:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("statefulSets: delete proxy bridge: brd.Name[%s]", brd.Name)
+
+		case watch.Modified:
+			h.server.AddProxyBridge(prxBrd)
+			h.log.Infof("statefulSets: modified proxy bridge: brd.Name[%s]", brd.Name)
+		}
+	}
+
 	return nil
 }

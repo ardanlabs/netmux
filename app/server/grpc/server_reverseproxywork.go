@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s server) ReverseProxyWork(req proxy.Proxy_ReverseProxyWorkServer) error {
+func (s *Server) ReverseProxyWork(req proxy.Proxy_ReverseProxyWorkServer) error {
 	var err error
 	defer func() {
 		if err != nil {

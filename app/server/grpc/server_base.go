@@ -5,7 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s *server) propagate(brd *proxy.Bridge) {
+func (s *Server) propagate(brd *proxy.Bridge) {
 	logrus.Infof("Actual data:")
 
 	s.eps.ForEach(func(k string, brd *proxy.Bridge) error {
@@ -17,7 +17,7 @@ func (s *server) propagate(brd *proxy.Bridge) {
 	s.signal.Broadcast(brd)
 }
 
-func (s *server) AddEp(b *proxy.Bridge) {
+func (s *Server) AddProxyBridge(b *proxy.Bridge) {
 	b.Bridgeop = "A"
 	existing, _ := s.eps.Get(b.Name)
 	if existing != nil {
@@ -31,7 +31,7 @@ func (s *server) AddEp(b *proxy.Bridge) {
 	s.eps.Set(b.Name, b)
 	s.propagate(b)
 }
-func (s *server) RemEp(b *proxy.Bridge) {
+func (s *Server) RemEp(b *proxy.Bridge) {
 	b.Bridgeop = "D"
 	existing, _ := s.eps.Get(b.Name)
 	if existing != nil {
@@ -43,8 +43,4 @@ func (s *server) RemEp(b *proxy.Bridge) {
 		return
 	}
 	s.propagate(b)
-}
-
-func Server() *server {
-	return &aServer
 }

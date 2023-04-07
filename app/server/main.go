@@ -1,13 +1,13 @@
 package main
 
 import (
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
-	"sync"
+	"syscall"
 
 	"github.com/ardanlabs.com/netmux/app/server/grpc"
 	"github.com/ardanlabs.com/netmux/app/server/k8s"
@@ -88,60 +88,52 @@ func run(log *logrus.Logger) error {
 	log.Infof("startup: config: %s", out)
 
 	// =========================================================================
+	// K8s Configuration
+
+	var k8sCfg k8s.Config
+	switch cfg.Server.Mode {
+	case "dev":
+		k8sCfg = k8s.Config{
+			//Kubefile:   "~/.kube/k8s.yaml",
+			Namespaces: []string{k8s.Namespace()},
+		}
+
+	case "dev-all":
+		k8sCfg = k8s.Config{
+			//Kubefile:   "~/.kube/k8s.yaml",
+			Namespaces:  []string{k8s.Namespace()},
+			AllServices: true,
+		}
+
+	default:
+		k8sCfg = k8s.Config{
+			//Kubefile:   "~/.kube/k8s.yaml",
+			Namespaces: []string{cfg.Server.Namespace},
+		}
+	}
+
+	// =========================================================================
 	// Start Server
 
-	mns, err := k8s.MyNamespace()
+	server, err := grpc.Start(log)
 	if err != nil {
-		log.Infof("could not determine the namespace: %w", err)
+		log.Infof("grpc.Start: %w", err)
 	}
-	log.Infof("running from namespace: %s", mns)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		var opts k8s.Opts
-		switch cfg.Server.Mode {
-		case "dev":
-			opts = k8s.Opts{
-				//Kubefile:   "~/.kube/k8s.yaml",
-				Namespaces: []string{mns},
-			}
-
-		case "dev-all":
-			opts = k8s.Opts{
-				//Kubefile:   "~/.kube/k8s.yaml",
-				Namespaces: []string{mns},
-				All:        true,
-			}
-
-		default:
-			opts = k8s.Opts{
-				//Kubefile:   "~/.kube/k8s.yaml",
-				Namespaces: []string{cfg.Server.Namespace},
-			}
-		}
-
-		if err := k8s.RunDev(ctx, &opts); err != nil {
-			log.Infof("k8s.Run in mode %q: %w", cfg.Server.Mode, err)
-		}
-	}()
-
-	err = grpc.Run()
+	k8s, err := k8s.Start(log, server, k8sCfg)
 	if err != nil {
-		log.Infof("grpc.Run: %w", err)
+		log.Infof("main: k8s.Start: mode[%s]: %w", cfg.Server.Mode, err)
 	}
 
 	// =========================================================================
 	// Stop Server
 
-	cancel()
-	wg.Wait()
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	<-shutdown
+
+	k8s.Shutdown()
+	server.Shutdown()
 
 	return nil
 }
