@@ -40,12 +40,9 @@ func (s *Service) ReverseProxyListen(listenServer proxy.Proxy_ReverseProxyListen
 		}
 
 		if err := s.listener(listenServer, listener, brd); err != nil {
-			listener.Close()
 			s.log.Infof("reverseProxyListen: listener: %s", brd, err)
 			return err
 		}
-
-		listener.Close()
 	}
 }
 
@@ -54,6 +51,7 @@ func (s *Service) listener(listenServer proxy.Proxy_ReverseProxyListenServer, li
 
 	s.updateReverseProxyLister(listener)
 	defer func() {
+		listener.Close()
 		s.updateReverseProxyLister(nil)
 	}()
 
