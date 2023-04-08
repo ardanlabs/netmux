@@ -6,63 +6,46 @@ import (
 	_ "embed"
 	"time"
 
-	"github.com/ardanlabs.com/netmux/foundation/config"
 	"github.com/ardanlabs.com/netmux/foundation/hash"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
-func Login(user string, pass string) (string, error) {
-	pwd, err := resolveConfig()
-	if err != nil {
+// Login authenticates a user.
+func (a *Auth) Login(name string, passHash string) (string, error) {
+	usr, exists := a.users[name]
+	if !exists {
+		return "", ErrUserNotFound
+	}
+
+	if err := hash.Decode(usr.PassHash, passHash); err != nil {
+		return "", ErrAuthError
+	}
+
+	rand.Seed(time.Now().UnixMilli())
+	userID := rand.String(32)
+
+	if err := a.nmconfig.AddToken(userID, usr.Name); err != nil {
 		return "", err
 	}
 
-	for _, e := range pwd.Entries {
-		if e.User == user {
-			if err := hash.Decode(e.Hash, pass); err != nil {
-				return "", ErrAuthError
-			}
-
-			cfg, err := config.Load()
-			if err != nil {
-				return "", err
-			}
-
-			rand.Seed(time.Now().UnixMilli())
-			uid := rand.String(32)
-
-			cfg.Tokens[uid] = user
-			if err := cfg.Save(); err != nil {
-				return "", err
-			}
-
-			return uid, nil
-		}
-	}
-
-	return "", ErrUserNotFound
+	return userID, nil
 }
 
-func Logout(token string) error {
-	cfg, err := config.Load()
-	if err != nil {
+// Logout clears the user as being authenticated.
+func (a *Auth) Logout(userID string) error {
+	if err := a.nmconfig.DeleteToken(userID); err != nil {
 		return err
 	}
 
-	delete(cfg.Tokens, token)
-	return cfg.Save()
+	return nil
 }
 
-func Check(token string) (string, error) {
-	cfg, err := config.Load()
+// Check validates if the specified user id exists.
+func (a *Auth) Check(userID string) (string, error) {
+	usr, err := a.nmconfig.Token(userID)
 	if err != nil {
-		return "", err
+		return "", ErrUserNotFound
 	}
 
-	user, ok := cfg.Tokens[token]
-	if ok && user != "" {
-		return user, nil
-	}
-
-	return "", ErrTokenNotFound
+	return usr, nil
 }

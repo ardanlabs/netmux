@@ -8,23 +8,23 @@ import (
 	"os/user"
 )
 
-func init() {
-	logrus.Warnf("RUNNING AUTH DEV MODE!!!")
-}
-
-func Login(username string, pass string) (string, error) {
+// Login authenticates a user.
+func (a *Auth) Login(name string, passHash string) (string, error) {
 	usr, err := user.Current()
 	if err != nil {
 		return "", err
 	}
+
 	return usr.Uid, nil
 }
 
-func Logout(token string) error {
+// Logout clears the user as being authenticated.
+func (a *Auth) Logout(userID string) error {
 	return nil
 }
 
-func Check(token string) (string, error) {
+// Check validates if the specified user id exists.
+func (a *Auth) Check(userID string) (string, error) {
 	usr, err := user.Current()
 	if err != nil {
 		return "", err

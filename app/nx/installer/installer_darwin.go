@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/ardanlabs.com/netmux/app/nx/service"
-	"github.com/ardanlabs.com/netmux/foundation/config"
+	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs.com/netmux/foundation/shell"
 	"github.com/sirupsen/logrus"
 )
@@ -46,13 +46,12 @@ func AutoInstall(ctx string, ns string, arch string) error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return err
 	}
 
-	err = service.Default().Load(cfg.FName)
-	if err != nil {
+	if err := service.Default().Load(cfg.FileName()); err != nil {
 		return err
 	}
 
@@ -191,12 +190,12 @@ func configFileSetup(ctx string, ns string) error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return err
 	}
 
-	if _, err := cfg.UpdateFName(cfgFName); err != nil {
+	if err := cfg.UpdateFileName(cfgFName); err != nil {
 		return err
 	}
 

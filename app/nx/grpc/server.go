@@ -14,7 +14,7 @@ import (
 	"github.com/ardanlabs.com/netmux/app/nx/service"
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
-	"github.com/ardanlabs.com/netmux/foundation/config"
+	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs.com/netmux/foundation/hosts"
 	"github.com/ardanlabs.com/netmux/foundation/signal"
 	"github.com/natefinch/lumberjack"
@@ -61,12 +61,12 @@ func (s *server) SetConfig(ctx context.Context, req *agent.StringMsg) (*agent.No
 	logrus.Infof("Loading config from: %s", req.Msg)
 	service.Reset()
 
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := cfg.UpdateFName(req.Msg); err != nil {
+	if err := cfg.UpdateFileName(req.Msg); err != nil {
 		return nil, err
 	}
 
@@ -78,12 +78,12 @@ func (s *server) SetConfig(ctx context.Context, req *agent.StringMsg) (*agent.No
 }
 
 func (s *server) GetConfig(ctx context.Context, req *agent.Noop) (*agent.StringMsg, error) {
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	res := &agent.StringMsg{Msg: cfg.FName}
+	res := &agent.StringMsg{Msg: cfg.FileName()}
 
 	return res, nil
 }
@@ -95,12 +95,12 @@ func (s *server) Connect(ctx context.Context, req *agent.StringMsg) (*agent.Noop
 		return nil, fmt.Errorf("context not found")
 	}
 
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	nxctx.Token = cfg.Tokens[req.Msg]
+	nxctx.Token, _ = cfg.Token(req.Msg)
 
 	var chCtxReady = make(chan struct{})
 	var chErr = make(chan error)
@@ -234,13 +234,12 @@ func (s *server) Login(ctx context.Context, req *agent.LoginMessage) (*agent.Str
 		return nil, err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	cfg.Tokens[req.Context] = tk
-	if err := cfg.Save(); err != nil {
+	if err := cfg.AddToken(req.Context, tk); err != nil {
 		return nil, err
 	}
 
@@ -257,13 +256,12 @@ func (s *server) Logout(ctx context.Context, req *agent.StringMsg) (*agent.Noop,
 		return nil, err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	cfg.Tokens[req.Msg] = ""
-	if err := cfg.Save(); err != nil {
+	if err := cfg.DeleteToken(req.Msg); err != nil {
 		return nil, err
 	}
 
@@ -355,12 +353,12 @@ func (s *server) Events(req *agent.Noop, res agent.Agent_EventsServer) error {
 func buildStatus(resetCounters bool) (*agent.StatusResponse, error) {
 	var ret = agent.StatusResponse{}
 
-	cfg, err := config.Load()
+	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	ret.Fname = cfg.FName
+	ret.Fname = cfg.FileName()
 	ret.Version = service.Ver + " - " + service.Semver
 
 	for i := range service.Default().Contexts {
@@ -538,19 +536,21 @@ func Run(actuser *user.User) error {
 		cfgSource = "/etc/netmux.yaml"
 	}
 
-	cfg, err := config.LoadFile(cfgSource)
+	cfg, err := nmconfig.LoadFile(cfgSource)
 	if err != nil {
 		return err
 	}
 
-	if cfg.FName != "" {
-		logrus.Infof("Using config: %s", cfg.FName)
+	fName := cfg.FileName()
+
+	if fName != "" {
+		logrus.Infof("Using config: %s", fName)
 		count := 0
 		for {
-			_, err := os.Stat(cfg.FName)
+			_, err := os.Stat(fName)
 			if err == nil {
-				logrus.Infof("Loading config: %s", cfg.FName)
-				service.Default().Load(cfg.FName)
+				logrus.Infof("Loading config: %s", fName)
+				service.Default().Load(fName)
 
 				break
 			}

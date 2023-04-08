@@ -9,20 +9,17 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/ardanlabs.com/netmux/app/server/auth"
 	"github.com/ardanlabs.com/netmux/app/server/monitor"
 	"github.com/ardanlabs.com/netmux/app/server/service"
+	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs/conf/v3"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
-var (
-	//go:embed version
-	ver string
-
-	//go:embed semver
-	semver string
-)
+// build is the git version of this program. It is set using build flags in the makefile.
+var build = "develop"
 
 func main() {
 	log := logrus.Logger{
@@ -58,10 +55,13 @@ func run(log *logrus.Logger) error {
 			Mode      string `conf:"default:dev-all"`
 			Namespace string `conf:"default:default"`
 		}
+		Auth struct {
+			PasswordFile string `conf:"default:zarf/users/default_users.yaml"`
+		}
 	}{
 		Version: conf.Version{
-			Build: ver,
-			Desc:  "semver: " + semver,
+			Build: build,
+			Desc:  "copyright information here",
 		},
 	}
 
@@ -78,7 +78,7 @@ func run(log *logrus.Logger) error {
 	// =========================================================================
 	// App Starting
 
-	log.Infof("starting service: version %s: semver: %s", ver, semver)
+	log.Info("starting service", "version", build)
 	defer log.Infof("shutdown complete")
 
 	out, err := conf.String(&cfg)
@@ -88,7 +88,25 @@ func run(log *logrus.Logger) error {
 	log.Infof("startup: config: %s", out)
 
 	// =========================================================================
-	// Monitor Configuration
+	// Start Service
+
+	nmconfig, err := nmconfig.Load()
+	if err != nil {
+		return fmt.Errorf("nmconfig.Load: %w", err)
+	}
+
+	a, err := auth.New(cfg.Auth.PasswordFile, nmconfig)
+	if err != nil {
+		return fmt.Errorf("auth.New: %w", err)
+	}
+
+	service, err := service.Start(log, a)
+	if err != nil {
+		log.Infof("grpc.Start: %w", err)
+	}
+
+	// =========================================================================
+	// Start Monitor
 
 	var mntCfg monitor.Config
 	switch cfg.Server.Mode {
@@ -110,14 +128,6 @@ func run(log *logrus.Logger) error {
 			//Kubefile:   "~/.kube/k8s.yaml",
 			Namespaces: []string{cfg.Server.Namespace},
 		}
-	}
-
-	// =========================================================================
-	// Start Services
-
-	service, err := service.Start(log)
-	if err != nil {
-		log.Infof("grpc.Start: %w", err)
 	}
 
 	monitor, err := monitor.Start(log, service, mntCfg)

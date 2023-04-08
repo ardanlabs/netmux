@@ -10,14 +10,14 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-func authUnaryServerInterceptor() grpc.UnaryServerInterceptor {
+func authUnaryServerInterceptor(auth *auth.Auth) grpc.UnaryServerInterceptor {
 	f := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, errors.New("no metadata available")
 		}
 
-		if err := doAuth(info.FullMethod, md); err != nil {
+		if err := doAuth(auth, info.FullMethod, md); err != nil {
 			return nil, fmt.Errorf("s.doAuth: %w", err)
 		}
 
@@ -27,14 +27,14 @@ func authUnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return f
 }
 
-func authStreamServerInterceptor() grpc.StreamServerInterceptor {
+func authStreamServerInterceptor(auth *auth.Auth) grpc.StreamServerInterceptor {
 	f := func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		md, ok := metadata.FromIncomingContext(ss.Context())
 		if !ok {
 			return errors.New("no metadata available")
 		}
 
-		if err := doAuth(info.FullMethod, md); err != nil {
+		if err := doAuth(auth, info.FullMethod, md); err != nil {
 			return fmt.Errorf("s.doAuth: %w", err)
 		}
 
@@ -44,7 +44,7 @@ func authStreamServerInterceptor() grpc.StreamServerInterceptor {
 	return f
 }
 
-func doAuth(method string, md metadata.MD) error {
+func doAuth(auth *auth.Auth, method string, md metadata.MD) error {
 	if method == "/proxy.NXProxy/Login" {
 		return nil
 	}

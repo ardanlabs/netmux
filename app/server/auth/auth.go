@@ -1,3 +1,4 @@
+// Package auth provides support for authentication.
 package auth
 
 import (
@@ -5,37 +6,58 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
+	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
+	"gopkg.in/yaml.v2"
 )
 
-type PasswdEntry struct {
-	User string `yaml:"user"`
-	Hash string `yaml:"hash"`
+// Set of error variables.
+var (
+	ErrUserNotFound = fmt.Errorf("user not found")
+	ErrAuthError    = fmt.Errorf("auth error")
+)
+
+// User represents a user and their password hash.
+type User struct {
+	Name     string `yaml:"user"`
+	PassHash string `yaml:"hash"`
 }
 
-type Passwd struct {
-	Entries []PasswdEntry `yaml:"entries"`
+// =============================================================================
+
+// Auth represents support for authentication.
+type Auth struct {
+	nmconfig *nmconfig.Config
+	users    map[string]User
 }
 
-//go:embed passwd.yaml
-var defpasswd []byte
-
-func resolveConfig() (*Passwd, error) {
-	fname := os.Getenv("PASSWD")
-	if fname == "" {
-		fname = "/app/etc/passwd.yaml"
-	}
-	bs, err := os.ReadFile(fname)
+// New constructs an auth value for use.
+func New(fName string, nmconfig *nmconfig.Config) (*Auth, error) {
+	yaml, err := os.ReadFile(fName)
 	if err != nil {
-		logrus.Warnf("ATTENTION: using default passwd")
-		bs = defpasswd
+		return nil, fmt.Errorf("os.ReadFile: %w", err)
 	}
-	ret := &Passwd{}
-	err = yaml.Unmarshal(bs, ret)
-	return ret, err
+
+	return Load(yaml, nmconfig)
 }
 
-var ErrUserNotFound = fmt.Errorf("user not found")
-var ErrAuthError = fmt.Errorf("auth error")
-var ErrTokenNotFound = fmt.Errorf("token not found")
+// Load takes a pre-read config and constructs an auth value for use.
+func Load(data []byte, nmconfig *nmconfig.Config) (*Auth, error) {
+	var users struct {
+		Entries []User `yaml:"entries"`
+	}
+	if err := yaml.Unmarshal(data, &users); err != nil {
+		return nil, fmt.Errorf("yaml.Unmarshal: %w", err)
+	}
+
+	m := make(map[string]User)
+	for _, password := range users.Entries {
+		m[password.Name] = password
+	}
+
+	ath := &Auth{
+		users:    m,
+		nmconfig: nmconfig,
+	}
+
+	return ath, nil
+}

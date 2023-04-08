@@ -23,6 +23,7 @@ import (
 type Service struct {
 	proxy.UnsafeProxyServer
 	log                *logrus.Logger
+	auth               *auth.Auth
 	grpc               *grpc.Server
 	signal             *signal.Signal[*proxy.Bridge]
 	bridges            *db.DB[*proxy.Bridge]
@@ -34,12 +35,13 @@ type Service struct {
 }
 
 // Start starts the proxy service.
-func Start(log *logrus.Logger) (*Service, error) {
+func Start(log *logrus.Logger, auth *auth.Auth) (*Service, error) {
 	srv := Service{
-		log: log,
+		log:  log,
+		auth: auth,
 		grpc: grpc.NewServer(
-			grpc.UnaryInterceptor(authUnaryServerInterceptor()),
-			grpc.StreamInterceptor(authStreamServerInterceptor()),
+			grpc.UnaryInterceptor(authUnaryServerInterceptor(auth)),
+			grpc.StreamInterceptor(authStreamServerInterceptor(auth)),
 		),
 		signal:   signal.New[*proxy.Bridge](),
 		bridges:  db.New[*proxy.Bridge](db.NopReadWriter{}),
@@ -218,17 +220,17 @@ func (s *Service) StreamConfig(nop *proxy.Noop, streamConfigServer proxy.Proxy_S
 func (s *Service) Login(ctx context.Context, loginReq *proxy.LoginReq) (*proxy.StringMsg, error) {
 	s.log.Infof("login: %s", loginReq.User)
 
-	resp, err := auth.Login(loginReq.User, loginReq.Pass)
+	userID, err := s.auth.Login(loginReq.User, loginReq.Pass)
 	if err != nil {
 		return nil, fmt.Errorf("auth.Login: %w", err)
 	}
 
-	return &proxy.StringMsg{Msg: resp}, err
+	return &proxy.StringMsg{Msg: userID}, err
 }
 
 // Logout is provided to implement the ProxyServer interface.
 func (s *Service) Logout(ctx context.Context, msg *proxy.StringMsg) (*proxy.Noop, error) {
-	if err := auth.Logout(msg.Msg); err != nil {
+	if err := s.auth.Logout(msg.Msg); err != nil {
 		return nil, fmt.Errorf("auth.Logout: %w", err)
 	}
 
