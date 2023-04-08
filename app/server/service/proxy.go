@@ -10,10 +10,10 @@ import (
 )
 
 // Proxy is provided to implement the ProxyServer interface.
-func (s *Service) Proxy(connectServer proxy.Proxy_ProxyServer) error {
-	localRecv, err := connectServer.Recv()
+func (s *Service) Proxy(proxyServer proxy.Proxy_ProxyServer) error {
+	localRecv, err := proxyServer.Recv()
 	if err != nil {
-		return fmt.Errorf("connectServer.Recv: %w", err)
+		return fmt.Errorf("proxyServer.Recv: %w", err)
 	}
 
 	if localRecv.Bridge == nil {
@@ -24,7 +24,7 @@ func (s *Service) Proxy(connectServer proxy.Proxy_ProxyServer) error {
 		return fmt.Errorf("could not find remote bridge for %q", localRecv.Bridge.Name)
 	}
 
-	brd := bridge.ToBridge(localRecv.Bridge)
+	brd := bridge.New(localRecv.Bridge)
 
 	remoteConn, err := brd.RemoteDial()
 	if err != nil {
@@ -43,7 +43,7 @@ func (s *Service) Proxy(connectServer proxy.Proxy_ProxyServer) error {
 		}()
 
 		for {
-			localRecv, err := connectServer.Recv()
+			localRecv, err := proxyServer.Recv()
 			if err != nil {
 				s.log.Infof("error receiving data from local %s: %s", brd.Name, err)
 				remoteConn.Close()
@@ -88,7 +88,7 @@ func (s *Service) Proxy(connectServer proxy.Proxy_ProxyServer) error {
 				Err: "",
 			}
 
-			if err := connectServer.Send(connIn); err != nil {
+			if err := proxyServer.Send(connIn); err != nil {
 				s.log.Infof("error sending data to local %s: bytes[%d]", brd.Name, n)
 				remoteConn.Close()
 				return

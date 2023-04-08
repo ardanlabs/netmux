@@ -9,127 +9,89 @@ import (
 	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
-func (s *Service) ReverseProxyListen(req proxy.Proxy_ReverseProxyListenServer) error {
-	var in *proxy.ConnOut
-	var err error
-	var l net.Listener
-	var chErr = make(chan error)
-	var b bridge.Bridge
+func (s *Service) updateReverseProxyLister(listener net.Listener) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	trace := func(s string, p ...interface{}) {
-		logrus.Tracef("ReverseProxyListen: %s", fmt.Sprintf(s, p...))
+	s.reverseProxyLister = listener
+}
+
+func (s *Service) shutdownReverseProxyListen() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.reverseProxyLister != nil {
+		s.reverseProxyLister.Close()
 	}
-	warn := func(s string, p ...interface{}) {
-		logrus.Warnf("ReverseProxyListen: %s", fmt.Sprintf(s, p...))
-	}
+}
 
-	maybeSend := func(err error) {
-		select {
-		case chErr <- err:
-		default:
-
-		}
-	}
-
-	closeListener := func() {
-		var err error
-		if l != nil {
-			trace("Closing listener")
-			err = l.Close()
-		} else {
-			trace("Listener is nil, no further action")
-		}
-
-		name := "no bridge"
-		if !b.IsZero() {
-			name = b.Name
-		}
-
+// ReverseProxyListen is provided to implement the ProxyServer interface.
+func (s *Service) ReverseProxyListen(listenServer proxy.Proxy_ReverseProxyListenServer) error {
+	for {
+		recv, err := listenServer.Recv()
 		if err != nil {
-			warn("error closing listener for %s", name)
-		} else {
-			trace("closing listener for %s (context cancelled)", name)
+			if errors.Is(err, io.EOF) {
+				s.log.Info("reverseProxyListen: EOF")
+				return nil
+			}
+
+			s.log.Info("reverseProxyListen: ERROR: %s", err)
+			return err
 		}
-		maybeSend(err)
-	}
 
-	loopListener := func() {
-		for {
-			if l == nil {
-				maybeSend(nil)
-				return
-			}
-			c, err := l.Accept()
-			if err != nil {
-				warn("Could accept conn for reverse ep connection to %s: %s",
-					b.String(), err.Error())
-				l.Close()
-				l = nil
-				maybeSend(err)
-				return
-			}
-
-			uid := uuid.NewString()
-			s.conns.Set(uid, c)
-			trace("REV conn awaiting: %s", uid)
-			err = req.Send(&proxy.RevProxyRequest{
-				ConnId: uid,
-			})
-			if err != nil {
-				c.Close()
-				s.conns.Delete(uid)
-				maybeSend(err)
-				return
-			}
+		if recv.Bridge == nil {
+			err := errors.New("reverseProxyListen: bridge info not provided")
+			s.log.Info(err)
+			return err
 		}
+
+		brd := bridge.New(recv.Bridge)
+
+		listener, err := brd.RemotePortListener()
+		if err != nil {
+			s.log.Infof("reverseProxyListen: could not make proxy listener for reverse ep connection to %s: %s", brd, err)
+			return err
+		}
+
+		if err := s.listener(listenServer, listener, brd); err != nil {
+			listener.Close()
+			s.log.Infof("reverseProxyListen: listener: %s", brd, err)
+			return err
+		}
+
+		listener.Close()
 	}
+}
 
-	loopStream := func() {
-		for {
-			in, err = req.Recv()
+func (s *Service) listener(listenServer proxy.Proxy_ReverseProxyListenServer, listener net.Listener, brd bridge.Bridge) error {
+	s.log.Infof("reverseProxyListen: listening name[%s] remote[%s]", brd.Name, brd.RemotePort)
 
-			switch {
+	s.updateReverseProxyLister(listener)
+	defer func() {
+		s.updateReverseProxyLister(nil)
+	}()
 
-			case errors.Is(err, io.EOF):
-				trace("Received EOF")
-				closeListener()
-				return
-			case err != nil:
-				warn("Received error: %s", err.Error())
-				maybeSend(err)
-				closeListener()
-				return
-			case in.Bridge == nil:
-				err := fmt.Errorf("bridge info not provided at ReverseProxyListen")
-				warn("Error: %s", err.Error())
-				maybeSend(err)
-				return
-			case l != nil:
-				trace("Received call, but listener still in place")
-				return
-			default:
-				b = bridge.ToBridge(in.Bridge)
-				logrus.Tracef("Proxy will listen: %s", b.String())
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			return fmt.Errorf("listener.Accept: %w", err)
+		}
 
-				l, err = b.RemotePortListener()
+		uid := uuid.NewString()
+		s.conns.Set(uid, conn)
 
-				if err != nil {
-					logrus.Warnf("Could not make proxy listener for reverse ep connection to %s: %s",
-						b.String(), err.Error())
-					maybeSend(err)
-					closeListener()
-				}
-				logrus.Debugf("Listening %s %s: OK", b.Name, b.RemotePort)
-				go loopListener()
-			}
+		s.log.Infof("reverseProxyListen: connection accepted: %s", uid)
+
+		req := proxy.RevProxyRequest{
+			ConnId: uid,
+		}
+
+		if err := listenServer.Send(&req); err != nil {
+			conn.Close()
+			s.conns.Delete(uid)
+			return fmt.Errorf("listenServer.Send: %w", err)
 		}
 	}
-
-	go loopStream()
-
-	err = <-chErr
-	return err
 }

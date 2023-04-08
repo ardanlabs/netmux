@@ -205,7 +205,7 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 	}
 
 	err = proxyStream.Send(&proxy.ConnOut{
-		Bridge: bridge.ToProtoBufBridge(s.Bridge),
+		Bridge: bridge.NewProxyBridge(s.Bridge),
 		Pl:     nil,
 	})
 	if err != nil {
@@ -287,7 +287,7 @@ func (s *Service) StartReverseServiceGrpc(chErr chan error) {
 		return
 	}
 
-	err = lcli.Send(&proxy.ConnOut{Bridge: bridge.ToProtoBufBridge(s.Bridge)})
+	err = lcli.Send(&proxy.ConnOut{Bridge: bridge.NewProxyBridge(s.Bridge)})
 	if err != nil {
 		logrus.Warnf("Error opening remote rev proxy listener conn %s: %s", s.Name(), err.Error())
 		chErr <- err

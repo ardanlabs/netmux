@@ -19,13 +19,15 @@ import (
 // Service represents a grpc proxy service.
 type Service struct {
 	proxy.UnsafeProxyServer
-	log      *logrus.Logger
-	grpc     *grpc.Server
-	signal   *signal.Signal[*proxy.Bridge]
-	bridges  *db.DB[*proxy.Bridge]
-	sessions *db.DB[string]
-	conns    *db.DB[net.Conn]
-	wg       sync.WaitGroup
+	log                *logrus.Logger
+	grpc               *grpc.Server
+	signal             *signal.Signal[*proxy.Bridge]
+	bridges            *db.DB[*proxy.Bridge]
+	sessions           *db.DB[string]
+	conns              *db.DB[net.Conn]
+	wg                 sync.WaitGroup
+	mu                 sync.Mutex
+	reverseProxyLister net.Listener
 }
 
 // Start starts the proxy service.
@@ -70,6 +72,7 @@ func (s *Service) Shutdown() {
 	s.log.Infof("proxy: starting shutdown")
 	defer s.log.Infof("proxy: shutdown")
 
+	s.shutdownReverseProxyListen()
 	s.grpc.GracefulStop()
 }
 

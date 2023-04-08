@@ -140,7 +140,7 @@ func (c *Context) onBridgeChange(ctx context.Context, bs *proxy.Bridges) error {
 
 			svc = &Service{
 				parent: c,
-				Bridge: bridge.ToBridge(e),
+				Bridge: bridge.New(e),
 				hosts:  hosts.New(),
 			}
 

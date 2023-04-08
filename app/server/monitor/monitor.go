@@ -209,7 +209,7 @@ func (mnt *Monitor) k8sPod(ctx context.Context, evtType watch.EventType, pod *co
 			mnt.log.Infof("pod: updated RemotePort: brd.RemotePort[%s]", brd.RemotePort)
 		}
 
-		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd := bridge.NewProxyBridge(brd)
 		prxBrd.K8Snamespace = pod.Namespace
 		prxBrd.K8Sname = pod.Name
 		prxBrd.K8Skind = pod.Kind
@@ -286,7 +286,7 @@ func (mnt *Monitor) k8sService(ctx context.Context, evtType watch.EventType, ser
 			mnt.log.Infof("service: updated Direction: brd.Direction[%s]", brd.Direction)
 		}
 
-		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd := bridge.NewProxyBridge(brd)
 		prxBrd.K8Snamespace = service.Namespace
 		prxBrd.K8Sname = service.Name
 		prxBrd.K8Skind = service.Kind
@@ -352,7 +352,7 @@ func (mnt *Monitor) k8sDeployment(ctx context.Context, evtType watch.EventType, 
 			mnt.log.Infof("deployment: updated Direction: brd.Direction[%s]", brd.Direction)
 		}
 
-		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd := bridge.NewProxyBridge(brd)
 		prxBrd.K8Snamespace = deployment.Namespace
 		prxBrd.K8Sname = deployment.Name
 		prxBrd.K8Skind = deployment.Kind
@@ -418,7 +418,7 @@ func (mnt *Monitor) k8sStatefulSets(ctx context.Context, evtType watch.EventType
 			mnt.log.Infof("statefulSets: updated Direction: brd.Direction[%s]", brd.Direction)
 		}
 
-		prxBrd := bridge.ToProtoBufBridge(brd)
+		prxBrd := bridge.NewProxyBridge(brd)
 		prxBrd.K8Snamespace = statefulSet.Namespace
 		prxBrd.K8Sname = statefulSet.Name
 		prxBrd.K8Skind = statefulSet.Kind

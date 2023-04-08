@@ -22,6 +22,34 @@ const (
 	ProtoTCP6 = "tcp6"
 )
 
+// =============================================================================
+
+// Bridges represetns a collection of bridge values.
+type Bridges []Bridge
+
+// LoadBridges constructs a collection of bridges based on the specified
+// annotation.
+func LoadBridges(annotation string) (Bridges, error) {
+	var bs Bridges
+	if err := yaml.Unmarshal([]byte(annotation), &bs); err != nil {
+		return nil, err
+	}
+
+	for _, b := range bs {
+		if b.Direction == "" {
+			b.Direction = DirectionForward
+		}
+
+		if b.Proto == "" {
+			b.Proto = ProtoTCP
+		}
+	}
+
+	return bs, nil
+}
+
+// =============================================================================
+
 // Bridge represents a networking bridge.
 type Bridge struct {
 	Name       string `yaml:"name"`
@@ -34,15 +62,34 @@ type Bridge struct {
 	Auto       bool   `yaml:"auto"`
 }
 
-// New constructs a bridge value for use.
-func New() Bridge {
-	b := Bridge{
-		Name:      uuid.NewString(),
-		Direction: DirectionForward,
-		Proto:     ProtoTCP,
+// New converts the specified protocol buffers bridge value and marshals it
+// into a bridge value.
+func New(proxy *proxy.Bridge) Bridge {
+	return Bridge{
+		LocalPort:  proxy.Localport,
+		LocalHost:  proxy.Localaddr,
+		RemotePort: proxy.Remoteport,
+		RemoteHost: proxy.Remoteaddr,
+		Proto:      proxy.Proto,
+		Name:       proxy.Name,
+		Direction:  proxy.Direction,
+		Auto:       proxy.Auto,
 	}
+}
 
-	return b
+// NewProxyBridge converts the specified bridge value and marshals it into
+// a protocol buffers bridge value.
+func NewProxyBridge(b Bridge) *proxy.Bridge {
+	return &proxy.Bridge{
+		Localport:  b.LocalPort,
+		Localaddr:  b.LocalHost,
+		Remoteport: b.RemotePort,
+		Remoteaddr: b.RemoteHost,
+		Proto:      b.Proto,
+		Name:       b.Name,
+		Direction:  b.Direction,
+		Auto:       b.Auto,
+	}
 }
 
 // Load converts the specified annotation into a Bridge.
@@ -117,62 +164,4 @@ func (b Bridge) localHostPort() string {
 
 func (b Bridge) remoteHostPort() string {
 	return net.JoinHostPort(b.RemoteHost, b.RemotePort)
-}
-
-// =============================================================================
-
-// ToProtoBufBridge converts the specified bridge value and marshals it into
-// a protocol buffers bridge value.
-func ToProtoBufBridge(b Bridge) *proxy.Bridge {
-	return &proxy.Bridge{
-		Localport:  b.LocalPort,
-		Localaddr:  b.LocalHost,
-		Remoteport: b.RemotePort,
-		Remoteaddr: b.RemoteHost,
-		Proto:      b.Proto,
-		Name:       b.Name,
-		Direction:  b.Direction,
-		Auto:       b.Auto,
-	}
-}
-
-// ToBridge converts the specified protocol buffers bridge value and marshals it
-// into a bridge value.
-func ToBridge(proxy *proxy.Bridge) Bridge {
-	return Bridge{
-		LocalPort:  proxy.Localport,
-		LocalHost:  proxy.Localaddr,
-		RemotePort: proxy.Remoteport,
-		RemoteHost: proxy.Remoteaddr,
-		Proto:      proxy.Proto,
-		Name:       proxy.Name,
-		Direction:  proxy.Direction,
-		Auto:       proxy.Auto,
-	}
-}
-
-// =============================================================================
-
-// Bridges represetns a collection of bridge values.
-type Bridges []Bridge
-
-// LoadBridges constructs a collection of bridges based on the specified
-// annotation.
-func LoadBridges(annotation string) (Bridges, error) {
-	var bs Bridges
-	if err := yaml.Unmarshal([]byte(annotation), &bs); err != nil {
-		return nil, err
-	}
-
-	for _, b := range bs {
-		if b.Direction == "" {
-			b.Direction = DirectionForward
-		}
-
-		if b.Proto == "" {
-			b.Proto = ProtoTCP
-		}
-	}
-
-	return bs, nil
 }
