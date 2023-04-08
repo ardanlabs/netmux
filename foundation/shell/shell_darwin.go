@@ -8,23 +8,29 @@ import (
 	"strings"
 )
 
-var Ifconfig ifconfig
-var Who who
-var Kill kill
-var Lsof lsof
-var Launchctl launchctl
+// Provides API access.
+var (
+	Ifconfig  ifconfig
+	Who       who
+	Kill      kill
+	Lsof      lsof
+	Launchctl launchctl
+)
 
 // =============================================================================
 
-func Ping(h string) (string, error) {
-	return executeStr(fmt.Sprintf("ping %s", h))
+// Ping performs network access to the specified address.
+func Ping(addr string) (string, error) {
+	return executeStr(fmt.Sprintf("ping %s", addr))
 }
 
-func Nmap(h string) (string, error) {
-	return executeStr(fmt.Sprintf("nmap %s", h))
+// Nmap preforms a network scan of the specified address.
+func Nmap(addr string) (string, error) {
+	return executeStr(fmt.Sprintf("nmap %s", addr))
 }
 
-func Nc(h string) (string, error) {
+// Netcat executes the netcat utility against the specified address.
+func Netcat(h string) (string, error) {
 	return executeStr(fmt.Sprintf("nc %s", h))
 }
 

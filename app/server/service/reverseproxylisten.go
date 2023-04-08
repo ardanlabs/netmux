@@ -21,7 +21,7 @@ func (s *Service) ReverseProxyListen(listenServer proxy.Proxy_ReverseProxyListen
 				return nil
 			}
 
-			s.log.Info("reverseProxyListen: listenServer.Recv: ERROR: %s", err)
+			s.log.Infof("reverseProxyListen: listenServer.Recv: ERROR: %s", err)
 			return fmt.Errorf("listenServer.Recv: %w", err)
 		}
 

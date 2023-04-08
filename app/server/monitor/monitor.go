@@ -216,15 +216,15 @@ func (mnt *Monitor) k8sPod(ctx context.Context, evtType watch.EventType, pod *co
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("pod: added bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("pod: delete bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Modified:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("pod: modified bridge: brd.Name[%s]", brd.Name)
 		}
 	}
@@ -293,15 +293,15 @@ func (mnt *Monitor) k8sService(ctx context.Context, evtType watch.EventType, ser
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("service: added bridge: prxBrd.Name[%s]", prxBrd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("service: delete bridge: prxBrd.Name[%s]", prxBrd.Name)
 
 		case watch.Modified:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("service: modified bridge: prxBrd.Name[%s]", prxBrd.Name)
 		}
 	}
@@ -359,15 +359,15 @@ func (mnt *Monitor) k8sDeployment(ctx context.Context, evtType watch.EventType, 
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("deployment: added bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("deployment: delete bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Modified:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("deployment: modified bridge: brd.Name[%s]", brd.Name)
 		}
 	}
@@ -425,15 +425,15 @@ func (mnt *Monitor) k8sStatefulSets(ctx context.Context, evtType watch.EventType
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("statefulSets: added bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("statefulSets: delete bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Modified:
-			mnt.service.AddProxyBridge(prxBrd)
+			mnt.service.AddBridge(prxBrd)
 			mnt.log.Infof("statefulSets: modified bridge: brd.Name[%s]", brd.Name)
 		}
 	}

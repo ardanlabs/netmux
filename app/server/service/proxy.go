@@ -11,22 +11,22 @@ import (
 
 // Proxy is provided to implement the ProxyServer interface.
 func (s *Service) Proxy(proxyServer proxy.Proxy_ProxyServer) error {
-	localRecv, err := proxyServer.Recv()
+	recv, err := proxyServer.Recv()
 	if err != nil {
 		return fmt.Errorf("proxyServer.Recv: %w", err)
 	}
 
-	if localRecv.Bridge == nil {
+	if recv.Bridge == nil {
 		return errors.New("bridge info not provided by the local proxy")
 	}
 
-	if _, err := s.bridges.Get(localRecv.Bridge.Name); err == nil {
-		return fmt.Errorf("could not find remote bridge for %q", localRecv.Bridge.Name)
+	if _, err := s.bridges.Get(recv.Bridge.Name); err == nil {
+		return fmt.Errorf("could not find remote bridge for %q", recv.Bridge.Name)
 	}
 
-	brd := bridge.New(localRecv.Bridge)
+	brd := bridge.New(recv.Bridge)
 
-	remoteConn, err := brd.RemoteDial()
+	conn, err := brd.RemoteDial()
 	if err != nil {
 		err = fmt.Errorf("could not make proxy ep connection to %s: %w", brd, err)
 		return err
@@ -43,20 +43,20 @@ func (s *Service) Proxy(proxyServer proxy.Proxy_ProxyServer) error {
 		}()
 
 		for {
-			localRecv, err := proxyServer.Recv()
+			recv, err := proxyServer.Recv()
 			if err != nil {
 				s.log.Infof("error receiving data from local %s: %s", brd.Name, err)
-				remoteConn.Close()
+				conn.Close()
 				return
 			}
 
-			s.log.Infof("receiving data from local %s: bytes[%d]", brd.Name, len(localRecv.Pl))
+			s.log.Infof("receiving data from local %s: bytes[%d]", brd.Name, len(recv.Pl))
 
-			if len(localRecv.Pl) > 0 {
-				n, err := remoteConn.Write(localRecv.Pl)
+			if len(recv.Pl) > 0 {
+				n, err := conn.Write(recv.Pl)
 				if err != nil {
 					s.log.Infof("error sending data to remote %s: %s", brd.Name, err)
-					remoteConn.Close()
+					conn.Close()
 					return
 				}
 
@@ -74,10 +74,10 @@ func (s *Service) Proxy(proxyServer proxy.Proxy_ProxyServer) error {
 		buf := make([]byte, 4096)
 
 		for {
-			n, err := remoteConn.Read(buf)
+			n, err := conn.Read(buf)
 			if err != nil {
 				s.log.Infof("error receiving data from remote %s: %s", brd.Name, err)
-				remoteConn.Close()
+				conn.Close()
 				return
 			}
 
@@ -90,7 +90,7 @@ func (s *Service) Proxy(proxyServer proxy.Proxy_ProxyServer) error {
 
 			if err := proxyServer.Send(connIn); err != nil {
 				s.log.Infof("error sending data to local %s: bytes[%d]", brd.Name, n)
-				remoteConn.Close()
+				conn.Close()
 				return
 			}
 		}
