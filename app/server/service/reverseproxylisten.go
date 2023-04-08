@@ -11,22 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *Service) updateReverseProxyLister(listener net.Listener) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.reverseProxyLister = listener
-}
-
-func (s *Service) shutdownReverseProxyListen() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.reverseProxyLister != nil {
-		s.reverseProxyLister.Close()
-	}
-}
-
 // ReverseProxyListen is provided to implement the ProxyServer interface.
 func (s *Service) ReverseProxyListen(listenServer proxy.Proxy_ReverseProxyListenServer) error {
 	for {
@@ -93,5 +77,21 @@ func (s *Service) listener(listenServer proxy.Proxy_ReverseProxyListenServer, li
 			s.conns.Delete(uid)
 			return fmt.Errorf("listenServer.Send: %w", err)
 		}
+	}
+}
+
+func (s *Service) updateReverseProxyLister(listener net.Listener) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.reverseProxyLister = listener
+}
+
+func (s *Service) shutdownReverseProxyListen() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.reverseProxyLister != nil {
+		s.reverseProxyLister.Close()
 	}
 }
