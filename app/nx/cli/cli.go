@@ -22,7 +22,7 @@ import (
 )
 
 func newClient() (agent.AgentClient, error) {
-	return agent.New(opts.User, opts.Pass)
+	return agent.NewClient(opts.User, opts.Pass)
 }
 
 func start() error {

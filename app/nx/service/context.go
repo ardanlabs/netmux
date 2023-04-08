@@ -194,7 +194,7 @@ func (c *Context) Start(ctx context.Context, chReady chan struct{}) error {
 
 	}
 
-	c.cli, err = proxy.New(c.UrlAsUrl.Host, c.Token)
+	c.cli, err = proxy.NewClient(c.UrlAsUrl.Host, c.Token)
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,7 @@ func (c *Context) Login(user string, pass string) (string, error) {
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.cli, err = proxy.New(c.UrlAsUrl.Host, "")
+	c.cli, err = proxy.NewClient(c.UrlAsUrl.Host, "")
 	if err != nil {
 		return "", err
 	}
@@ -290,7 +290,7 @@ func (c *Context) Logout() error {
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.cli, err = proxy.New(c.UrlAsUrl.Host, c.Token)
+	c.cli, err = proxy.NewClient(c.UrlAsUrl.Host, c.Token)
 	if err != nil {
 		return err
 	}

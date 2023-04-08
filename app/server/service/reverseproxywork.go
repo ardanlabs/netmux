@@ -1,4 +1,4 @@
-package proxy
+package service
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s *Proxy) ReverseProxyWork(req proxy.Proxy_ReverseProxyWorkServer) error {
+func (s *Service) ReverseProxyWork(req proxy.Proxy_ReverseProxyWorkServer) error {
 	var err error
 	defer func() {
 		if err != nil {

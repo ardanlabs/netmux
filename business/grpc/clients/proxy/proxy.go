@@ -5,8 +5,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// New constructs a ProxyClient value.
-func New(target string, tk string) (ProxyClient, error) {
+// NewClient constructs a ProxyClient value.
+func NewClient(target string, tk string) (ProxyClient, error) {
 	options := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),

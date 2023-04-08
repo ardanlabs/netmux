@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// New constructs an AgentClient value.
-func New(user string, password string) (AgentClient, error) {
+// NewClient constructs an AgentClient value.
+func NewClient(user string, password string) (AgentClient, error) {
 	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, "unix", addr)

@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/ardanlabs.com/netmux/app/server/monitor"
-	"github.com/ardanlabs.com/netmux/app/server/proxy"
+	"github.com/ardanlabs.com/netmux/app/server/service"
 	"github.com/ardanlabs/conf/v3"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -115,12 +115,12 @@ func run(log *logrus.Logger) error {
 	// =========================================================================
 	// Start Services
 
-	proxy, err := proxy.Start(log)
+	service, err := service.Start(log)
 	if err != nil {
 		log.Infof("grpc.Start: %w", err)
 	}
 
-	monitor, err := monitor.Start(log, proxy, mntCfg)
+	monitor, err := monitor.Start(log, service, mntCfg)
 	if err != nil {
 		log.Infof("main: k8s.Start: mode[%s]: %w", cfg.Server.Mode, err)
 	}
@@ -133,7 +133,7 @@ func run(log *logrus.Logger) error {
 	<-shutdown
 
 	monitor.Shutdown()
-	proxy.Shutdown()
+	service.Shutdown()
 
 	return nil
 }

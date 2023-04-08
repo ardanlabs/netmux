@@ -31,7 +31,7 @@ const (
 var logo []byte
 
 func newClient() (agent.AgentClient, error) {
-	return agent.New("", "")
+	return agent.NewClient("", "")
 }
 
 func wError(a fyne.App, err string) {

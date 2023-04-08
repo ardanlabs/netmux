@@ -19,7 +19,7 @@ var _cli agent.AgentClient
 func aCli() agent.AgentClient {
 	if _cli == nil {
 		var err error
-		_cli, err = agent.New("", "")
+		_cli, err = agent.NewClient("", "")
 		if err != nil {
 			_cli = nil
 			logrus.Warnf(err.Error())
