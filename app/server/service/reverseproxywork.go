@@ -2,74 +2,93 @@ package service
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
-	"github.com/sirupsen/logrus"
 )
 
-func (s *Service) ReverseProxyWork(req proxy.Proxy_ReverseProxyWorkServer) error {
-	var err error
-	defer func() {
-		if err != nil {
-			logrus.Debugf("Leaving ReverseProxyWork conn w err: %s", err.Error())
-		} else {
-			logrus.Debugf("Leaving ReverseProxyWork conn - no err")
-		}
-
-	}()
-	in, err := req.Recv()
+// ReverseProxyWork is provided to implement the ProxyServer interface.
+func (s *Service) ReverseProxyWork(workServer proxy.Proxy_ReverseProxyWorkServer) error {
+	recv, err := workServer.Recv()
 	if err != nil {
-		return err
+		s.log.Info("reverseProxyWork: workServer.Recv: ERROR: %s", err)
+		return fmt.Errorf("workServer.Recv: %w", err)
 	}
-	c, _ := s.conns.Get(in.ConnId)
-	if c == nil {
-		return fmt.Errorf("connection not found for %s", in.ConnId)
+
+	conn, err := s.conns.Get(recv.ConnId)
+	if err != nil {
+		s.log.Info("reverseProxyWork: s.conns.Get: recv.ConnId %s: ERROR: %s", recv.ConnId, err)
+		return fmt.Errorf("s.conns.Get: recv.ConnId %s: %w", recv.ConnId, err)
 	}
 
 	defer func() {
-		s.conns.Delete(in.ConnId)
+		s.conns.Delete(recv.ConnId)
 	}()
 
-	logrus.Debugf("REV conn working: %s", in.ConnId)
-	chErr := make(chan error)
+	s.log.Infof("reverseProxyWork: connection accepted: %s", recv.ConnId)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	go func() {
+		defer func() {
+			s.log.Infof("shutting down %q for proxy local to remote", recv.ConnId)
+			wg.Done()
+		}()
+
+		for {
+			localRecv, err := workServer.Recv()
+			if err != nil {
+				s.log.Infof("error receiving data from local %s: %s", recv.ConnId, err)
+				conn.Close()
+				return
+			}
+
+			s.log.Infof("receiving data from local %s: bytes[%d]", recv.ConnId, len(localRecv.Pl))
+
+			if len(localRecv.Pl) > 0 {
+				n, err := conn.Write(localRecv.Pl)
+				if err != nil {
+					s.log.Infof("error sending data to remote %s: %s", recv.ConnId, err)
+					conn.Close()
+					return
+				}
+
+				s.log.Infof("sent data to remote %s: bytes[%d]", recv.ConnId, n)
+			}
+		}
+	}()
+
+	go func() {
+		defer func() {
+			s.log.Infof("shutting down %q for proxy remote to local", recv.ConnId)
+			wg.Done()
+		}()
+
 		buf := make([]byte, 4096)
+
 		for {
-			n, err := c.Read(buf)
+			n, err := conn.Read(buf)
 			if err != nil {
-				c.Close()
-				chErr <- err
+				s.log.Infof("error receiving data from remote %s: %s", recv.ConnId, err)
+				conn.Close()
 				return
 			}
-			err = req.Send(&proxy.RevProxyConnOut{
+
+			s.log.Infof("receiving data from remote %s: bytes[%d]", recv.ConnId, n)
+
+			connOut := &proxy.RevProxyConnOut{
 				Pl: buf[:n],
-			})
-			if err != nil {
-				c.Close()
-				chErr <- err
+			}
+
+			if err := workServer.Send(connOut); err != nil {
+				s.log.Infof("error sending data to local %s: bytes[%d]", recv.ConnId, n)
+				conn.Close()
 				return
 			}
 		}
 	}()
 
-	go func() {
-		for {
-			in, err = req.Recv()
-			if err != nil {
-				c.Close()
-				chErr <- err
-				return
-			}
-			_, err = c.Write(in.Pl)
-			if err != nil {
-				c.Close()
-				chErr <- err
-				return
-			}
-		}
-	}()
-
-	err = <-chErr
-	return err
+	wg.Wait()
+	return nil
 }

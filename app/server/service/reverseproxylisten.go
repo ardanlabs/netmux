@@ -21,21 +21,21 @@ func (s *Service) ReverseProxyListen(listenServer proxy.Proxy_ReverseProxyListen
 				return nil
 			}
 
-			s.log.Info("reverseProxyListen: ERROR: %s", err)
-			return err
+			s.log.Info("reverseProxyListen: listenServer.Recv: ERROR: %s", err)
+			return fmt.Errorf("listenServer.Recv: %w", err)
 		}
 
 		if recv.Bridge == nil {
-			err := errors.New("reverseProxyListen: bridge info not provided")
-			s.log.Info(err)
+			err := errors.New("bridge info not provided")
+			s.log.Infof("reverseProxyListen: ERROR: %s", err)
 			return err
 		}
 
 		brd := bridge.New(recv.Bridge)
 
 		if err := s.listener(listenServer, brd); err != nil {
-			s.log.Infof("reverseProxyListen: listener: %s", err)
-			return err
+			s.log.Infof("reverseProxyListen: s.listener: ERROR: %s", err)
+			return fmt.Errorf("s.listener: %w", err)
 		}
 	}
 }
