@@ -45,8 +45,7 @@ func (s *Service) listener(listenServer proxy.Proxy_ReverseProxyListenServer, br
 
 	listener, err := brd.RemotePortListener()
 	if err != nil {
-		s.log.Infof("reverseProxyListen: could not make proxy listener for reverse ep connection to %s: %s", brd, err)
-		return err
+		return fmt.Errorf("brd.RemotePortListener: %w", err)
 	}
 
 	s.updateReverseProxyLister(listener)
