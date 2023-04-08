@@ -33,21 +33,21 @@ func (s *Service) ReverseProxyListen(listenServer proxy.Proxy_ReverseProxyListen
 
 		brd := bridge.New(recv.Bridge)
 
-		listener, err := brd.RemotePortListener()
-		if err != nil {
-			s.log.Infof("reverseProxyListen: could not make proxy listener for reverse ep connection to %s: %s", brd, err)
-			return err
-		}
-
-		if err := s.listener(listenServer, listener, brd); err != nil {
+		if err := s.listener(listenServer, brd); err != nil {
 			s.log.Infof("reverseProxyListen: listener: %s", brd, err)
 			return err
 		}
 	}
 }
 
-func (s *Service) listener(listenServer proxy.Proxy_ReverseProxyListenServer, listener net.Listener, brd bridge.Bridge) error {
+func (s *Service) listener(listenServer proxy.Proxy_ReverseProxyListenServer, brd bridge.Bridge) error {
 	s.log.Infof("reverseProxyListen: listening name[%s] remote[%s]", brd.Name, brd.RemotePort)
+
+	listener, err := brd.RemotePortListener()
+	if err != nil {
+		s.log.Infof("reverseProxyListen: could not make proxy listener for reverse ep connection to %s: %s", brd, err)
+		return err
+	}
 
 	s.updateReverseProxyLister(listener)
 	defer func() {
