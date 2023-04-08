@@ -34,7 +34,7 @@ func (s *Service) ReverseProxyListen(listenServer proxy.Proxy_ReverseProxyListen
 		brd := bridge.New(recv.Bridge)
 
 		if err := s.listener(listenServer, brd); err != nil {
-			s.log.Infof("reverseProxyListen: listener: %s", brd, err)
+			s.log.Infof("reverseProxyListen: listener: %s", err)
 			return err
 		}
 	}
