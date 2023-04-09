@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/ardanlabs.com/netmux/app/nx/cli/monitor"
-	"github.com/ardanlabs.com/netmux/app/nx/cli/tray"
-	"github.com/ardanlabs.com/netmux/app/nx/cli/webview"
-	"github.com/ardanlabs.com/netmux/app/nx/installer"
-	"github.com/ardanlabs.com/netmux/app/nx/service"
+	"github.com/ardanlabs.com/netmux/business/cli/installer"
+	"github.com/ardanlabs.com/netmux/business/cli/monitor"
+	"github.com/ardanlabs.com/netmux/business/cli/service"
+	"github.com/ardanlabs.com/netmux/business/cli/tray"
+	"github.com/ardanlabs.com/netmux/business/cli/webview"
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/ardanlabs.com/netmux/foundation/hash"
 	"github.com/hpcloud/tail"
@@ -93,7 +93,7 @@ func epList() error {
 
 var actuser *user.User
 
-func Run() error {
+func Run(log *logrus.Logger) error {
 	var err error
 	actuser, err = user.Current()
 	if err != nil {
@@ -121,7 +121,7 @@ func Run() error {
 	case "tray disable":
 		return trayDisable()
 	case "tray run":
-		return tray.Run(actuser)
+		return tray.Run(log, actuser)
 	case "ctx install <ctx> <kctx> <ns> <arch>":
 		return ctxInstall()
 	case "ctx uninstall <ctx>":

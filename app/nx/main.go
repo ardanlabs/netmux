@@ -1,32 +1,27 @@
 package main
 
 import (
-	_ "embed"
+	"os"
 
 	"github.com/ardanlabs.com/netmux/app/nx/cli"
-	"github.com/ardanlabs.com/netmux/app/nx/service"
 	"github.com/sirupsen/logrus"
 )
 
-//go:embed version
-var ver string
-
-//go:embed semver
-var semver string
-
-func run() error {
-
-	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetFormatter(&logrus.TextFormatter{})
-	service.Ver = ver
-	service.Semver = semver
-
-	return cli.Run()
-}
+// build is the git version of this program. It is set using build flags in the makefile.
+var build = "develop"
 
 func main() {
-	err := run()
-	if err != nil {
-		panic(err)
+	log := logrus.Logger{
+		Out:       os.Stdout,
+		Formatter: new(logrus.TextFormatter),
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.DebugLevel,
+	}
+
+	log.Infof("main: version %q", build)
+
+	if err := cli.Run(&log); err != nil {
+		log.Infof("main: ERROR: %s", err)
+		os.Exit(1)
 	}
 }

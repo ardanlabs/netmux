@@ -30,7 +30,7 @@ func main() {
 	}
 
 	if err := run(&log); err != nil {
-		log.Infof("startup: ERROR: %s", err)
+		log.Infof("main: ERROR: %s", err)
 		os.Exit(1)
 	}
 }
@@ -44,7 +44,7 @@ func run(log *logrus.Logger) error {
 	if _, err := maxprocs.Set(opt); err != nil {
 		return fmt.Errorf("maxprocs: %w", err)
 	}
-	log.Infof("startup: GOMAXPROCS: %d", runtime.GOMAXPROCS(0))
+	log.Infof("main: GOMAXPROCS: %d", runtime.GOMAXPROCS(0))
 
 	// =========================================================================
 	// Configuration
@@ -78,14 +78,14 @@ func run(log *logrus.Logger) error {
 	// =========================================================================
 	// App Starting
 
-	log.Info("starting service", "version", build)
-	defer log.Infof("shutdown complete")
+	log.Infof("main: version %q", build)
+	defer log.Infof("main: shutdown complete")
 
 	out, err := conf.String(&cfg)
 	if err != nil {
 		return fmt.Errorf("generating config for output: %w", err)
 	}
-	log.Infof("startup: config: %s", out)
+	log.Infof("main: config: %s", out)
 
 	// =========================================================================
 	// Start Service
@@ -102,7 +102,7 @@ func run(log *logrus.Logger) error {
 
 	service, err := service.Start(log, a)
 	if err != nil {
-		log.Infof("grpc.Start: %w", err)
+		return fmt.Errorf("grpc.Start: %w", err)
 	}
 
 	// =========================================================================

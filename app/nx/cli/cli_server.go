@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ardanlabs.com/netmux/app/nx/grpc"
+	"github.com/ardanlabs.com/netmux/business/cli/grpc"
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 )
 

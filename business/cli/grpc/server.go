@@ -11,7 +11,7 @@ import (
 	"os/user"
 	"time"
 
-	"github.com/ardanlabs.com/netmux/app/nx/service"
+	"github.com/ardanlabs.com/netmux/business/cli/service"
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
 	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
 	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
