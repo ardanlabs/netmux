@@ -1,5 +1,5 @@
-// Package service provides support for running a grpc proxy service.
-package service
+// Package grpc provides support for running a grpc proxy service.
+package grpc
 
 import (
 	"context"

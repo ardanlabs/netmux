@@ -10,8 +10,8 @@ import (
 	"syscall"
 
 	"github.com/ardanlabs.com/netmux/app/server/auth"
+	"github.com/ardanlabs.com/netmux/app/server/grpc"
 	"github.com/ardanlabs.com/netmux/app/server/monitor"
-	"github.com/ardanlabs.com/netmux/app/server/service"
 	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs/conf/v3"
 	"github.com/sirupsen/logrus"
@@ -100,7 +100,7 @@ func run(log *logrus.Logger) error {
 		return fmt.Errorf("auth.New: %w", err)
 	}
 
-	service, err := service.Start(log, a)
+	service, err := grpc.Start(log, a)
 	if err != nil {
 		return fmt.Errorf("grpc.Start: %w", err)
 	}

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ardanlabs.com/netmux/app/server/service"
+	"github.com/ardanlabs.com/netmux/app/server/grpc"
 	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
@@ -45,14 +45,14 @@ type Config struct {
 // Monitor represents an API for working with Kubernetes.
 type Monitor struct {
 	log      *logrus.Logger
-	service  *service.Service
+	service  *grpc.Service
 	wg       sync.WaitGroup
 	shutdown context.CancelFunc
 }
 
 // Start starts the k8s support for connecting, watching and creating abstractions
 // in kubernetes.
-func Start(log *logrus.Logger, service *service.Service, cfg Config) (*Monitor, error) {
+func Start(log *logrus.Logger, service *grpc.Service, cfg Config) (*Monitor, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
