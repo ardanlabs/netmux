@@ -33,6 +33,11 @@ func DefaultK8sController() *K8SController {
 	return def
 }
 
+func NewK8SController() *K8SController {
+	var ret = &K8SController{}
+	return ret
+}
+
 func (k *K8SController) TestConn(ctx *Context) error {
 	fmt.Println("Get Kubernetes pods")
 
@@ -499,7 +504,7 @@ func (k *K8SController) deployCreateService(ctx context.Context, cli *kubernetes
 	return err
 }
 
-func (k *K8SController) setupDeployGlobal(ctx context.Context, clientset *kubernetes.Clientset, arch string) error {
+func (k *K8SController) setupDeployGlobal(ctx context.Context, clientset *kubernetes.Clientset, nmxctx *Context, ns string, kctx string, arch string) error {
 	err := k.deployCreateNamespace(ctx, clientset)
 
 	if err != nil {
@@ -535,7 +540,7 @@ func (k *K8SController) setupDeployGlobal(ctx context.Context, clientset *kubern
 	return nil
 }
 
-func (k *K8SController) setupDeployNS(ctx context.Context, clientset *kubernetes.Clientset, ns string, arch string) error {
+func (k *K8SController) setupDeployNS(ctx context.Context, clientset *kubernetes.Clientset, nmxctx *Context, ns string, kctx string, arch string) error {
 	err := k.deployCreateRBACForNS(ctx, clientset, ns)
 
 	if err != nil {
@@ -594,7 +599,7 @@ func (k *K8SController) checkDeployReady(ctx context.Context, clientset *kuberne
 	}
 }
 
-func (k *K8SController) SetupDeploy(ctx context.Context, nmxctx *Context, ns string, arch string) error {
+func (k *K8SController) SetupDeploy(ctx context.Context, nmxctx *Context, ns string, kctx string, arch string) error {
 
 	kubeConfig, err := resolveClientConfig(nmxctx.Runtime.Kubeconfig, nmxctx.Runtime.Kubecontext)
 	if err != nil {
@@ -605,20 +610,13 @@ func (k *K8SController) SetupDeploy(ctx context.Context, nmxctx *Context, ns str
 	if err != nil {
 		return err
 	}
-	switch ns {
-	case "*":
-		err = k.setupDeployGlobal(ctx, clientset, arch)
-		if err != nil {
-			return err
-		}
+	if ns == "*" {
+		k.setupDeployGlobal(ctx, clientset, nmxctx, ns, kctx, arch)
 		ns = NetmuxName
-	default:
-		err = k.setupDeployNS(ctx, clientset, ns, arch)
-		if err != nil {
-			return err
-		}
-	}
+	} else {
+		k.setupDeployNS(ctx, clientset, nmxctx, ns, kctx, arch)
 
+	}
 	k.checkDeployReady(ctx, clientset, ns)
 
 	return nil

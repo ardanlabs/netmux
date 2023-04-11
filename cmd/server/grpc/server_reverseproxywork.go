@@ -6,7 +6,7 @@ import (
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 )
 
-func (s *ServerImpl) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) error {
+func (s server) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) error {
 	var err error
 	defer func() {
 		if err != nil {
@@ -37,10 +37,7 @@ func (s *ServerImpl) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) err
 		for {
 			n, err := c.Read(buf)
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s", errClose.Error())
-				}
+				c.Close()
 				chErr <- err
 				return
 			}
@@ -48,10 +45,7 @@ func (s *ServerImpl) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) err
 				Pl: buf[:n],
 			})
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s", errClose.Error())
-				}
+				c.Close()
 				chErr <- err
 				return
 			}
@@ -62,19 +56,13 @@ func (s *ServerImpl) ReverseProxyWork(req pb.NXProxy_ReverseProxyWorkServer) err
 		for {
 			in, err = req.Recv()
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s", errClose.Error())
-				}
+				c.Close()
 				chErr <- err
 				return
 			}
 			_, err = c.Write(in.Pl)
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s", errClose.Error())
-				}
+				c.Close()
 				chErr <- err
 				return
 			}

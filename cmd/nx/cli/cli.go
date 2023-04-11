@@ -17,12 +17,12 @@ import (
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/cli/webview"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/installer"
 	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/foundation/argon2"
+	"go.digitalcircle.com.br/dc/netmux/lib/argon2"
 	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
 func newClient() (agent.AgentClient, error) {
-	return agent.NewUnixDefault()
+	return agent.NewUnixDefault(opts.User, opts.Pass)
 }
 
 func start() error {
@@ -31,10 +31,6 @@ func start() error {
 
 func stop() error {
 	return nil
-}
-
-func printOut(s string, p ...any) {
-	_, _ = os.Stdout.WriteString(fmt.Sprintf(s+"\n", p...))
 }
 
 func exit() error {
@@ -108,84 +104,85 @@ func Run() error {
 
 	switch cliCtx.Command() {
 	case "exit":
-		err = exit()
+		exit()
 	case "server":
-		err = server()
+		server()
 
 	case "webview":
-		err = webview.Run()
+		return webview.Run()
 	case "status":
-		err = status()
+		return status()
 	case "tray install":
-		err = trayInstall()
+		return trayInstall()
 	case "tray uninstall":
-		err = trayUninstall()
+		return trayUninstall()
 	case "tray enable":
-		err = trayEnable()
+		return trayEnable()
 	case "tray disable":
-		err = trayDisable()
+		return trayDisable()
 	case "tray run":
-		err = tray.Run(actuser)
+		return tray.Run(actuser)
 	case "ctx install <ctx> <kctx> <ns> <arch>":
-		err = ctxInstall()
+		return ctxInstall()
 	case "ctx uninstall <ctx>":
-		err = ctxUninstall()
+		return ctxUninstall()
 	case "ctx login <ctx>":
-		err = ctxLogin()
+		return ctxLogin()
 	case "ctx logout <ctx>":
-		err = ctxLogout()
+		return ctxLogout()
 	case "ctx on <ctx>":
-		err = ctxOn()
+		return ctxOn()
 	case "ctx off <ctx>":
-		err = ctxOff()
+		return ctxOff()
 	case "ctx pfon <ctx>":
-		err = ctxPfOn()
+		return ctxPfOn()
 	case "ctx pfoff <ctx>":
-		err = ctxPfOff()
+		return ctxPfOff()
 	case "ctx reset <ctx>":
-		err = ctxReset()
+		return ctxReset()
 	case "ctx ping <ctx> <cmd>":
-		err = ctxPing()
+		return ctxPing()
 	case "ctx pscan <ctx> <cmd>":
-		err = ctxPscan()
+		return ctxPscan()
 	case "ctx speedtest <ctx> <pl>":
-		err = ctxSpeedTest()
+		return ctxSpeedTest()
 	case "ctx nc <ctx> <cmd>":
-		err = ctxNc()
+		return ctxNc()
 	case "svc on <ctx> <svc>":
-		err = svcOn()
+		return svcOn()
 	case "svc off <ctx> <svc>":
-		err = svcOff()
+		return svcOff()
 	case "svc reset <ctx> <svc>":
-		err = svcReset()
+		return svcReset()
 
 	case "config set <fname>":
-		err = configSet()
+		return configSet()
 	case "config dump":
-		err = configDump()
+		return configDump()
 	case "config get":
-		err = configGet()
+		return configGet()
 	case "config hosts show":
-		err = hostsShow()
+		return hostsShow()
 	case "config hosts reset":
-		err = hostsReset()
+		return hostsReset()
 
 	case "version":
 		logrus.Infof("%s: %s", service.Default().Semver, service.Default().Version)
+		return nil
 
 	case "monitor":
-		err = monitorHandler()
+		return monitorHandler()
 
 	case "logs":
 		t, err := tail.TailFile("/tmp/netmux.log", tail.Config{Follow: true})
 		if err != nil {
-			return err
+			panic(err)
 		}
 		for line := range t.Lines {
-			printOut(line.Text)
+			_, _ = os.Stdout.WriteString(line.Text + "\n")
 		}
 	case "agent install":
-		err := installer.Install()
+		err := installer.Install(opts.Agent.Install.Ctx, opts.Agent.Install.Ns)
 		if err != nil {
 			return err
 		}
@@ -201,16 +198,16 @@ func Run() error {
 		}
 
 	case "ep ls":
-		err = epList()
+		return epList()
 
 	case "auth hash":
-		gen, err := argon2.GenerateHash(opts.Pass)
+		gen, err := argon2.GenerateFromPassword(opts.Pass)
 		if err != nil {
 			return err
 		}
 		println(gen)
 	default:
-		err = fmt.Errorf("unknown command: %s", cliCtx.Command())
+		return fmt.Errorf("unknown command: %s", cliCtx.Command())
 	}
-	return err
+	return nil
 }

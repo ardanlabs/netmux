@@ -13,24 +13,24 @@ import (
 	"time"
 )
 
-type ServerImpl struct {
+type server struct {
 	pb.UnsafeNXProxyServer
-	eps      *memdb.Memdb[*pb.Bridge]
-	sessions *memdb.Memdb[string]
-	conns    *memdb.Memdb[net.Conn]
+	eps      memdb.Memdb[*pb.Bridge]
+	sessions memdb.Memdb[string]
+	conns    memdb.Memdb[net.Conn]
 
 	chmux *chmux.ChMux[[]*pb.Bridge]
 }
 
-func (s *ServerImpl) mustEmbedUnimplementedServerServiceServer() {
+func (s server) mustEmbedUnimplementedServerServiceServer() {
 
 }
 
-func (s *ServerImpl) Ver(_ context.Context, _ *pb.Noop) (*pb.Noop, error) {
+func (s server) Ver(_ context.Context, _ *pb.Noop) (*pb.Noop, error) {
 	return &pb.Noop{}, nil
 }
 
-func (s *ServerImpl) Login(_ context.Context, req *pb.LoginReq) (*pb.StringMsg, error) {
+func (s server) Login(ctx context.Context, req *pb.LoginReq) (*pb.StringMsg, error) {
 	logrus.Warnf("Will auth: %#v", req)
 
 	str, err := auth.Login(req.User, req.Pass)
@@ -38,17 +38,17 @@ func (s *ServerImpl) Login(_ context.Context, req *pb.LoginReq) (*pb.StringMsg, 
 	return &pb.StringMsg{Msg: str}, err
 }
 
-func (s *ServerImpl) Logout(_ context.Context, req *pb.StringMsg) (*pb.Noop, error) {
+func (s server) Logout(ctx context.Context, req *pb.StringMsg) (*pb.Noop, error) {
 	err := auth.Logout(req.Msg)
 	return &pb.Noop{}, err
 }
 
-func (s *ServerImpl) GetConfigs(_ context.Context, _ *pb.Noop) (*pb.Bridges, error) {
+func (s server) GetConfigs(ctx context.Context, req *pb.Noop) (*pb.Bridges, error) {
 	ret := &pb.Bridges{Eps: s.eps.Items()}
 	return ret, nil
 }
 
-func (s *ServerImpl) StreamConfig(_ *pb.Noop, server pb.NXProxy_StreamConfigServer) error {
+func (s server) StreamConfig(req *pb.Noop, server pb.NXProxy_StreamConfigServer) error {
 	ret := &pb.Bridges{Eps: s.eps.Items()}
 	err := server.Send(ret)
 	if err != nil {
@@ -89,29 +89,22 @@ func (s *ServerImpl) StreamConfig(_ *pb.Noop, server pb.NXProxy_StreamConfigServ
 	}
 }
 
-func (s *ServerImpl) KeepAlive(_ *pb.Noop, res pb.NXProxy_KeepAliveServer) error {
+func (s server) KeepAlive(req *pb.Noop, res pb.NXProxy_KeepAliveServer) error {
 	for {
-		err := res.Send(&pb.StringMsg{Msg: "PING"})
+		res.Send(&pb.StringMsg{Msg: "PING"})
 		time.Sleep(time.Second)
-		if err != nil {
-			return err
-		}
 	}
 }
 
-var aServer = ServerImpl{
+var aServer = server{
 	eps:      memdb.New[*pb.Bridge](),
 	sessions: memdb.New[string](),
 	conns:    memdb.New[net.Conn](),
 	chmux:    chmux.New[[]*pb.Bridge](),
 }
 
-func Server() *ServerImpl {
-	return &aServer
-}
-
 func Run() error {
-	logrus.Infof("Running ServerImpl at 0.0.0.0:48080")
+	logrus.Infof("Running server at 0.0.0.0:48080")
 	l, err := net.Listen("tcp", "0.0.0.0:48080")
 	if err != nil {
 		return err
@@ -124,6 +117,6 @@ func Run() error {
 		grpc.UnaryInterceptor(authUnaryServerInterceptor()),
 		grpc.StreamInterceptor(authStreamServerInterceptor()),
 	)
-	pb.RegisterNXProxyServer(grpcServer, serverImpl())
+	pb.RegisterNXProxyServer(grpcServer, Server())
 	return grpcServer.Serve(l)
 }

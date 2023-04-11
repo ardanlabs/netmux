@@ -98,9 +98,9 @@ func (m *Memdb[T]) Items() []T {
 	return ret
 }
 
-func New[T any]() *Memdb[T] {
+func New[T any]() Memdb[T] {
 	var ret = Memdb[T]{
 		Db: make(map[string]T),
 	}
-	return &ret
+	return ret
 }

@@ -3,16 +3,15 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"os"
-	"strconv"
-
 	"github.com/sirupsen/logrus"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"net/url"
+	"os"
+	"strconv"
 )
 
 type Context struct {
@@ -119,27 +118,22 @@ func (c *Context) StopPortForwarding() error {
 	return nil
 }
 
-func (c *Context) onBridgeChange(bs *pb.Bridges) error {
+func (c *Context) onBridgeChange(ctx context.Context, bs *pb.Bridges) error {
+
 	for _, e := range bs.Eps {
 		e := e
 		switch e.Bridgeop {
 		case "D":
 			svc := c.SvcByName(e.Name)
 			if svc != nil {
-				err := svc.Stop()
-				if err != nil {
-					logrus.Warnf("error stopping service %s", svc.Name())
-				}
+				svc.Stop()
 				c.DelSvcByName(e.Name)
 			}
 
 		default:
 			svc := c.SvcByName(e.Name)
 			if svc != nil {
-				err := svc.Stop()
-				if err != nil {
-					logrus.Warnf("error stopping service %s", svc.Name())
-				}
+				svc.Stop()
 				c.DelSvcByName(e.Name)
 			}
 			b := types.NewBridge()
@@ -214,12 +208,7 @@ func (c *Context) Start(ctx context.Context, chReady chan struct{}) error {
 
 	c.Status = StatusStarted
 
-	go func() {
-		err := c.monitorBridges()
-		if err != nil {
-			logrus.Warnf("error monitoring bridges: %s", err.Error())
-		}
-	}()
+	go c.monitorBridges()
 
 	chReady <- struct{}{}
 
@@ -236,7 +225,7 @@ func (c *Context) monitorBridges() error {
 		if err != nil {
 			return err
 		}
-		err = c.onBridgeChange(bs)
+		err = c.onBridgeChange(c.ctx, bs)
 		if err != nil {
 			return err
 		}
@@ -270,13 +259,7 @@ func (c *Context) Login(user string, pass string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		defer func() {
-			err := c.StopPortForwarding()
-			if err != nil {
-				logrus.Warnf("error stopping port forward: %s", err.Error())
-			}
-
-		}()
+		defer c.StopPortForwarding()
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)
@@ -302,12 +285,7 @@ func (c *Context) Logout() error {
 		if err != nil {
 			return err
 		}
-		defer func() {
-			err := c.StopPortForwarding()
-			if err != nil {
-				logrus.Warnf("error stopping port forward: %s", err.Error())
-			}
-		}()
+		defer c.StopPortForwarding()
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)

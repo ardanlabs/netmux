@@ -8,7 +8,7 @@ import (
 	"net"
 )
 
-func NewUnixDefault() (AgentClient, error) {
+func NewUnixDefault(user string, password string) (AgentClient, error) {
 
 	var (
 		credentials = insecure.NewCredentials() // No SSL/TLS

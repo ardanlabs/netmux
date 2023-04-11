@@ -3,12 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
 	"github.com/dustin/go-humanize"
 	"github.com/rodaine/table"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
+	"os"
+	"strings"
+	"time"
 )
 
 func status() error {
@@ -26,10 +26,6 @@ func status() error {
 
 func statusOnce() error {
 	cli, err := newClient()
-	if err != nil {
-		return fmt.Errorf("newClient: %w", err)
-	}
-
 	var req = &pb.StringMsg{Msg: ""}
 	if opts.Status.Zero {
 		req = &pb.StringMsg{Msg: "zero"}
@@ -38,10 +34,10 @@ func statusOnce() error {
 	if err != nil {
 		return err
 	}
-	printOut("Measure Time: " + time.Now().String() + "\n")
-	printOut("Version: " + strings.Replace(res.Version, "\n", " ", 1) + "\n")
+	os.Stdout.WriteString("Measure Time: " + time.Now().String() + "\n")
+	os.Stdout.WriteString("Version: " + strings.Replace(res.Version, "\n", " ", 1) + "\n")
 
-	printOut("Config: " + res.Fname + "\n")
+	os.Stdout.WriteString("Config: " + res.Fname + "\n")
 
 	tbl := table.New("CTX", "SVC", "STATUS", "AUTO", "PROTO", "LADDR", "LPORT", "RADDR", "RPORT", "NCONNS", "SENT", "RECV")
 	for _, ctx := range res.Contexts {
@@ -71,7 +67,10 @@ func statusOnce() error {
 	}
 
 	tbl.Print()
-	printOut("=====\n")
+	os.Stdout.WriteString("=====\n")
+	if opts.Status.Zero {
+
+	}
 
 	return nil
 }

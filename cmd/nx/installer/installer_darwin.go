@@ -5,6 +5,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
+	"go.digitalcircle.com.br/dc/netmux/lib/cmd"
+	"go.digitalcircle.com.br/dc/netmux/lib/config"
 	"io"
 	"os"
 	"os/user"
@@ -12,11 +16,6 @@ import (
 	"runtime"
 	"strconv"
 	"time"
-
-	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/cmd/nx/service"
-	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
-	"go.digitalcircle.com.br/dc/netmux/lib/config"
 )
 
 var VarContext = []byte("${CONTEXT}")
@@ -37,7 +36,7 @@ func AutoInstall(ctx string, ns string, arch string) error {
 	if arch == "" {
 		arch = runtime.GOARCH
 	}
-	err = Install()
+	err = Install(ctx, ns)
 	if err != nil {
 		return err
 	}
@@ -64,13 +63,14 @@ func AutoInstall(ctx string, ns string, arch string) error {
 	err = service.DefaultK8sController().SetupDeploy(
 		context.Background(),
 		nxctx,
+		ctx,
 		ns,
 		arch)
 
 	return err
 }
 
-func Install() error {
+func Install(ctx string, ns string) error {
 	execName, err := os.Executable()
 	if err != nil {
 		return err
@@ -101,13 +101,13 @@ func Install() error {
 	if err != nil {
 		return err
 	}
-	ret, err := shell.Launchctl.InstallDaemon()
+	ret, err := cmd.LaunchCtlInstallDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		return err
 	}
 	time.Sleep(time.Second * 10)
-	ret, err = shell.Launchctl.StartDaemon()
+	ret, err = cmd.LaunchCtlStartDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		logrus.Warnf(err.Error())
@@ -116,13 +116,13 @@ func Install() error {
 }
 
 func Uninstall() error {
-	ret, err := shell.Launchctl.StopDaemon()
+	ret, err := cmd.LaunchCtlStopDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		logrus.Warnf(fmt.Errorf("error stopping daemon: %s, %s", ret, err).Error())
 	}
 
-	ret, err = shell.Launchctl.UnistallDaemon()
+	ret, err = cmd.LaunchCtlUnistallDaemon()
 	logrus.Infof(ret)
 	if err != nil {
 		logrus.Warnf(fmt.Errorf("error uninstalling daemon: %s, %s", ret, err).Error())
@@ -204,15 +204,15 @@ func InstallTray() (string, error) {
 		return "", nil
 	}
 
-	aUser, err := user.Lookup(username)
+	user, err := user.Lookup(username)
 	if err != nil {
 		return "", err
 	}
 
-	err = os.WriteFile(fmt.Sprintf("%s/Library/LaunchAgents/nx.tray.plist", aUser.HomeDir), NxLocalPlist, 0600)
+	err = os.WriteFile(fmt.Sprintf("%s/Library/LaunchAgents/nx.tray.plist", user.HomeDir), NxLocalPlist, 0600)
 	if err != nil {
 		return "", err
 	}
-	return shell.Launchctl.InstallTrayAgent()
+	return cmd.LaunchCtlInstallTrayAgent()
 	//cmd.LaunchCtlEnableTrayAgent()
 }

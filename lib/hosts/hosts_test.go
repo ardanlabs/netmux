@@ -15,14 +15,11 @@ func TestBasic(t *testing.T) {
 	var b = New()
 	a.LoadBytes([]byte(str))
 	log.Printf("%#v", a.entries)
-	log.Print(string(a.Bytes()))
+	log.Printf(string(a.Bytes()))
 	b.LoadBytes(a.Bytes())
 	if !a.Equals(b) {
 		t.Fatal("Should be equal")
 	}
-	err := b.RemoveByComment("hosts2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	log.Print(string(b.Bytes()))
+	b.RemoveByComment("hosts2")
+	log.Printf(string(b.Bytes()))
 }

@@ -2,10 +2,9 @@ package config
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+	"os"
 )
 
 func trace(s string, p ...interface{}) {
@@ -26,7 +25,6 @@ func (c *Config) Save() error {
 	}
 	return os.WriteFile(c.Src, bs, 0600)
 }
-
 func (c *Config) Load() error {
 	trace("Loading config")
 	src := c.Src
@@ -39,8 +37,7 @@ func (c *Config) Load() error {
 	c.Src = src
 	return err
 }
-
-func New() (*Config, error) {
+func New() *Config {
 	ret := Config{
 		Src:    Fname,
 		Fname:  "",
@@ -53,28 +50,21 @@ func New() (*Config, error) {
 			logrus.Infof("Using config from: %s", ret.Src)
 		} else {
 			ret.Src = "/app/persistence/netmux.yaml"
-			err := os.MkdirAll("/app/persistence", os.ModePerm)
-			if err != nil {
-				return nil, err
-			}
+			os.MkdirAll("/app/persistence", os.ModePerm)
 			logrus.Infof("Using config from: %s", ret.Src)
 		}
 
 	}
 
-	return &ret, nil
+	return &ret
 }
 
-var def *Config
+var def = New()
 
 func Default() *Config {
 	if def == nil {
-		var err error
-		def, err = New()
-		if err != nil {
-			panic(err)
-		}
-		err = def.Load()
+		def = New()
+		err := def.Load()
 		if err != nil {
 			panic(err)
 		}

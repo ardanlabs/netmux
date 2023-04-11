@@ -7,6 +7,8 @@ import (
 )
 
 const (
+	KeyUser  = "user"
+	KeyPass  = "password"
 	KeyToken = "token"
 )
 

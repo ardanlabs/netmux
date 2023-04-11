@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
-
 	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
+	cmd2 "go.digitalcircle.com.br/dc/netmux/lib/cmd"
 	"go.digitalcircle.com.br/dc/netmux/lib/hosts"
 	pb "go.digitalcircle.com.br/dc/netmux/lib/proto/server"
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
+	"net"
 )
 
 type Service struct {
@@ -61,7 +60,7 @@ func (s *Service) listen() error {
 
 	logrus.Debugf("Listening service %s: %s", s.Name(), s.IpAddr)
 
-	err = shell.Ifconfig.AddAlias(Default().Iface, s.IpAddr)
+	err = cmd2.IfconfigAddAlias(Default().Iface, s.IpAddr)
 
 	if err != nil {
 		return err
@@ -69,24 +68,20 @@ func (s *Service) listen() error {
 
 	s.uuidIfconfig = TermHanlder.add(func() error {
 		s.uuidIfconfig = ""
-		err = shell.Ifconfig.RemoveAlias(Default().Iface, s.IpAddr)
+		err = cmd2.IfconfigRemAlias(Default().Iface, s.IpAddr)
 		if err != nil {
 			logrus.Warnf("error reseting alias: %v", err)
 		}
 		return nil
 	})
 	def := hosts.Default()
-	err = def.Add(s.IpAddr, []string{s.Bridge.LocalAddr}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
-	if err != nil {
-		return err
-	}
+	def.Add(s.IpAddr, []string{s.Bridge.LocalAddr}, fmt.Sprintf("#nx: ctx:(%s) ep:(%s)", s.parent.Name, s.Name()))
 
 	s.uuidHostname = TermHanlder.add(func() error {
 		s.uuidHostname = ""
-		err := def.RemoveByComment(fmt.Sprintf("ep:(%s)", s.Name()))
+		def.RemoveByComment(fmt.Sprintf("ep:(%s)", s.Name()))
 
 		if err != nil {
-			//not preventing termination on purpose
 			logrus.Warnf("error reseting alias: %v", err)
 		}
 		return nil
@@ -113,10 +108,7 @@ func (s *Service) listen() error {
 	go func() {
 		<-s.ctx.Done()
 		if s.Listener != nil {
-			err = s.Listener.Close()
-			if err != nil {
-				logrus.Warnf("Error closing listener: %s", err.Error())
-			}
+			s.Listener.Close()
 		}
 	}()
 
@@ -125,12 +117,7 @@ func (s *Service) listen() error {
 		if err != nil {
 			return err
 		}
-		go func() {
-			err := s.handleConnGrpc(c)
-			if err != nil {
-				logrus.Warnf("Error in handleConnGrpc: %s", err.Error())
-			}
-		}()
+		go s.handleConnGrpc(c)
 
 	}
 }
@@ -183,7 +170,7 @@ func (s *Service) Start() error {
 		}
 
 	default:
-		err = fmt.Errorf("direction %s is unknown for service %s", s.Bridge.Direction, s.Name())
+		err = fmt.Errorf("Direction %s is unknown for service %s", s.Bridge.Direction, s.Name())
 	}
 
 	return err
@@ -228,17 +215,20 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 	}
 	chErr := make(chan error)
 
+	//bridge := s.Bridge
+	//fout, _ := os.OpenFile(fmt.Sprintf("%s_%s_%v.out", bridge.RemoteAddr, bridge.RemotePort, time.Now().UnixMilli()), os.O_CREATE|os.O_RDWR, 0600)
+	//fin, _ := os.OpenFile(fmt.Sprintf("%s_%s_%v.in", bridge.RemoteAddr, bridge.RemotePort, time.Now().UnixMilli()), os.O_CREATE|os.O_RDWR, 0600)
+
+	//defer fout.Close()
+	//defer fin.Close()
+
 	go func() {
 		buf := make([]byte, 4096)
 		for {
 			n, err := c.Read(buf)
 			s.Sent = s.Sent + int64(n)
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("Error closing connection: %s", err.Error())
-				}
-
+				c.Close()
 				chErr <- err
 				return
 			}
@@ -247,10 +237,7 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 				Pl: buf[:n],
 			})
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("Error closing connection: %s", err.Error())
-				}
+				c.Close()
 				chErr <- err
 				return
 			}
@@ -261,10 +248,7 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 		for {
 			ci, err := proxyStream.Recv()
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("Error closing connection: %s", err.Error())
-				}
+				c.Close()
 				chErr <- err
 				return
 			}
@@ -272,10 +256,7 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 
 			_, err = c.Write(ci.Pl)
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("Error closing connection: %s", err.Error())
-				}
+				c.Close()
 				chErr <- err
 				return
 			}
@@ -366,10 +347,7 @@ func (s *Service) handleDataConnGrpc(id string) {
 		n, err := c.Read(buf)
 		if err != nil {
 			chErr <- err
-			errClose := c.Close()
-			if errClose != nil {
-				logrus.Warnf("Error closing connection: %s", err.Error())
-			}
+			c.Close()
 			return
 		}
 		err = rpw.Send(&pb.RevProxyConnIn{
@@ -378,10 +356,7 @@ func (s *Service) handleDataConnGrpc(id string) {
 		})
 		if err != nil {
 			chErr <- err
-			errClose := c.Close()
-			if errClose != nil {
-				logrus.Warnf("Error closing connection: %s", err.Error())
-			}
+			c.Close()
 			return
 		}
 	}()
@@ -390,19 +365,13 @@ func (s *Service) handleDataConnGrpc(id string) {
 		res, err := rpw.Recv()
 		if err != nil {
 			chErr <- err
-			errClose := c.Close()
-			if errClose != nil {
-				logrus.Warnf("Error closing connection: %s", err.Error())
-			}
+			c.Close()
 			return
 		}
 		_, err = c.Write(res.Pl)
 		if err != nil {
 			chErr <- err
-			errClose := c.Close()
-			if errClose != nil {
-				logrus.Warnf("Error closing connection: %s", err.Error())
-			}
+			c.Close()
 			return
 		}
 	}()

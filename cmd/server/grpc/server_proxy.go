@@ -7,7 +7,7 @@ import (
 	"go.digitalcircle.com.br/dc/netmux/lib/types"
 )
 
-func (s *ServerImpl) Proxy(connectServer pb.NXProxy_ProxyServer) error {
+func (s server) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 
 	co, err := connectServer.Recv()
 	if err != nil {
@@ -29,7 +29,7 @@ func (s *ServerImpl) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 	}
 	c, err := bridge.DialRemote()
 	if err != nil {
-		err = fmt.Errorf("could not make proxy ep connection to %s: %s", bridge.String(), err.Error())
+		err = fmt.Errorf("Could not make proxy ep connection to %s", bridge.String(), err.Error())
 		logrus.Warnf(err.Error())
 		return err
 	}
@@ -41,23 +41,16 @@ func (s *ServerImpl) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 		for {
 			co, err := connectServer.Recv()
 			if err != nil {
-				chErr <- fmt.Errorf("error receiving data from local %s: %s", bridge.Name, err.Error())
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s: %s", bridge.Name, errClose.Error())
-				}
+				chErr <- fmt.Errorf("Error receiving data from local %s: %s", bridge.Name, err.Error())
+				c.Close()
 				chErr <- err
 				return
 			}
 			if len(co.Pl) > 0 {
 				_, err = c.Write(co.Pl)
 				if err != nil {
-					err := c.Close()
-					errClose := c.Close()
-					if errClose != nil {
-						logrus.Warnf("error closing %s: %s", bridge.Name, errClose.Error())
-					}
-					chErr <- fmt.Errorf("error sending data from proxy %s: %s", bridge.Name, err.Error())
+					c.Close()
+					chErr <- fmt.Errorf("Error sending data from proxy %s: %s", bridge.Name, err.Error())
 					return
 				}
 			}
@@ -69,11 +62,8 @@ func (s *ServerImpl) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 		for {
 			n, err := c.Read(buf)
 			if err != nil {
-				chErr <- fmt.Errorf("error receiving data from proxy %s: %s", bridge.Name, err.Error())
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s: %s", bridge.Name, errClose.Error())
-				}
+				chErr <- fmt.Errorf("Error receiving data from proxy %s: %s", bridge.Name, err.Error())
+				c.Close()
 				chErr <- err
 				return
 			}
@@ -83,11 +73,8 @@ func (s *ServerImpl) Proxy(connectServer pb.NXProxy_ProxyServer) error {
 				Err: "",
 			})
 			if err != nil {
-				chErr <- fmt.Errorf("error sending data to local %s: %s", bridge.Name, err.Error())
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s: %s", bridge.Name, errClose.Error())
-				}
+				chErr <- fmt.Errorf("Error sending data to local %s: %s", bridge.Name, err.Error())
+				c.Close()
 
 				chErr <- err
 				return

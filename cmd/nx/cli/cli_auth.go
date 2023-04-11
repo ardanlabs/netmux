@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"os"
+
 	"go.digitalcircle.com.br/dc/netmux/lib/proto/agent"
 )
 
@@ -18,7 +20,7 @@ func ctxLogin() error {
 		Context:  opts.Ctx.Login.Ctx,
 	})
 	if err == nil {
-		printOut("Logged IN w success")
+		os.Stdout.WriteString("Logged IN w success")
 	}
 	if opts.Ctx.Login.On {
 		opts.Ctx.On.Ctx = opts.Ctx.Login.Ctx
@@ -36,7 +38,7 @@ func ctxLogout() error {
 
 	_, err = cli.Logout(context.Background(), &agent.StringMsg{Msg: opts.Ctx.Logout.Ctx})
 	if err == nil {
-		printOut("Logged OUT w success")
+		os.Stdout.WriteString("Logged OUT w success")
 	}
 	return err
 }

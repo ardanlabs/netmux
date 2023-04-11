@@ -11,7 +11,7 @@ import (
 	"net"
 )
 
-func (s *ServerImpl) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) error {
+func (s server) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer) error {
 	var in *pb.ConnOut
 	var err error
 	var l net.Listener
@@ -64,12 +64,9 @@ func (s *ServerImpl) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer)
 			}
 			c, err := l.Accept()
 			if err != nil {
-				warn("Could not accept conn for reverse ep connection to %s: %s",
+				warn("Could accept conn for reverse ep connection to %s: %s",
 					bridge.String(), err.Error())
-				errClose := l.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s: %s", bridge.Name, errClose.Error())
-				}
+				l.Close()
 				l = nil
 				maybeSend(err)
 				return
@@ -82,10 +79,7 @@ func (s *ServerImpl) ReverseProxyListen(req pb.NXProxy_ReverseProxyListenServer)
 				ConnId: uid,
 			})
 			if err != nil {
-				errClose := c.Close()
-				if errClose != nil {
-					logrus.Warnf("error closing %s: %s", bridge.Name, errClose.Error())
-				}
+				c.Close()
 				s.conns.Del(uid)
 				maybeSend(err)
 				return

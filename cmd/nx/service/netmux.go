@@ -3,17 +3,16 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"go.digitalcircle.com.br/dc/netmux/lib/cmd"
+	"go.digitalcircle.com.br/dc/netmux/lib/memdb"
+	"gopkg.in/yaml.v3"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/sirupsen/logrus"
-	"go.digitalcircle.com.br/dc/netmux/foundation/shell"
-	"go.digitalcircle.com.br/dc/netmux/lib/memdb"
-	"gopkg.in/yaml.v3"
 )
 
 type Status string
@@ -43,16 +42,10 @@ var ErrCouldNotReadConfig = fmt.Errorf("could not read config")
 
 var defaultCfg = new(Netmux)
 
-func Reset() error {
-	err := defaultCfg.Stop()
-	if err != nil {
-		return err
-	}
-
+func Reset() {
+	defaultCfg.Stop()
 	defaultCfg = new(Netmux)
-	return nil
 }
-
 func Default() *Netmux {
 	return defaultCfg
 }
@@ -194,7 +187,6 @@ func (c *Netmux) Prepare(loggedUserName string, s string) error {
 
 	return nil
 }
-
 func (c *Netmux) CtxByName(n string) *Context {
 
 	for _, v := range c.Contexts {
@@ -204,7 +196,6 @@ func (c *Netmux) CtxByName(n string) *Context {
 	}
 	return nil
 }
-
 func (c *Netmux) ResetCounters() {
 	for _, v := range c.Contexts {
 		v.ResetCounters()
@@ -221,11 +212,10 @@ func (c *Netmux) Stop() error {
 	c.Status = StatusStopped
 	return nil
 }
-
 func (c *Netmux) Load(f string) error {
 	var err error
 	c.Status = StatusLoading
-	loggedUser, err := shell.Who.ConsoleUser()
+	loggedUser, err := cmd.LoggedUser()
 	if err != nil {
 		return err
 	}
@@ -234,7 +224,6 @@ func (c *Netmux) Load(f string) error {
 
 	return err
 }
-
 func (c *Netmux) Start(username string, fname string, ctxs []string) (err error) {
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	c.Status = StatusStarting
