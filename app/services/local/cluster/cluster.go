@@ -13,6 +13,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type Status string
+type RuntimeType string
+
+const (
+	StatusDisconnected Status      = "disconnected"
+	StatusConnecting   Status      = "connecting"
+	StatusAvailable    Status      = "available"
+	StatusDisabled     Status      = "disabled"
+	StatusStarting     Status      = "starting"
+	StatusStarted      Status      = "started"
+	StatusRunning      Status      = "running"
+	StatusStopping     Status      = "stopping"
+	StatusStopped      Status      = "stopped"
+	StatusLoading      Status      = "loading"
+	StatusError        Status      = "error"
+	RuntimeKubernetes  RuntimeType = "kubernetes"
+
+	Sock = "/tmp/netmux.sock"
+)
+
 // stats maintains stats for accessing the cluster service.
 type stats struct {
 	status      Status
@@ -68,6 +88,21 @@ func (c *Cluster) Shutdown() {
 }
 
 // =============================================================================
+
+// StartListening
+func (c *Cluster) StartListening() error {
+	go func() {
+		err := s.listen()
+		if err != nil {
+			logrus.Warnf("service.Start::error listening: %s", err.Error())
+		}
+	}()
+
+	if s.listener != nil {
+		_ = s.listener.Close()
+	}
+	return nil
+}
 
 func (c *Cluster) listen() error {
 	c.mu.Lock()
@@ -138,21 +173,6 @@ func (c *Cluster) listen() error {
 		go c.handleConnGrpc(conn)
 
 	}
-}
-
-func (s *Cluster) StartForward() error {
-
-	go func() {
-		err := s.listen()
-		if err != nil {
-			logrus.Warnf("service.Start::error listening: %s", err.Error())
-		}
-	}()
-
-	if s.listener != nil {
-		_ = s.listener.Close()
-	}
-	return nil
 }
 
 func (s *Cluster) Stop() error {
