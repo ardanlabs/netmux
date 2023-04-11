@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/business/grpc/cluster"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
@@ -62,9 +62,9 @@ type Bridge struct {
 	Auto       bool   `yaml:"auto"`
 }
 
-// New converts the specified protocol buffers bridge value and marshals it
+// New converts the specified cluster bridge value and marshals it
 // into a bridge value.
-func New(proxy *proxy.Bridge) Bridge {
+func New(proxy *cluster.Bridge) Bridge {
 	return Bridge{
 		LocalPort:  proxy.Localport,
 		LocalHost:  proxy.Localaddr,
@@ -77,10 +77,10 @@ func New(proxy *proxy.Bridge) Bridge {
 	}
 }
 
-// NewProxyBridge converts the specified bridge value and marshals it into
+// NewClusterBridge converts the specified bridge value and marshals it into
 // a protocol buffers bridge value.
-func NewProxyBridge(b Bridge) *proxy.Bridge {
-	return &proxy.Bridge{
+func NewClusterBridge(b Bridge) *cluster.Bridge {
+	return &cluster.Bridge{
 		Localport:  b.LocalPort,
 		Localaddr:  b.LocalHost,
 		Remoteport: b.RemotePort,
