@@ -88,7 +88,7 @@ func run(log *logrus.Logger) error {
 	log.Infof("main: config: %s", out)
 
 	// =========================================================================
-	// Start Service
+	// Start GRPC Server
 
 	nmconfig, err := nmconfig.Load()
 	if err != nil {
@@ -100,7 +100,7 @@ func run(log *logrus.Logger) error {
 		return fmt.Errorf("auth.New: %w", err)
 	}
 
-	service, err := grpc.Start(log, a)
+	grpc, err := grpc.Start(log, a)
 	if err != nil {
 		return fmt.Errorf("grpc.Start: %w", err)
 	}
@@ -130,7 +130,7 @@ func run(log *logrus.Logger) error {
 		}
 	}
 
-	monitor, err := monitor.Start(log, service, mntCfg)
+	monitor, err := monitor.Start(log, grpc, mntCfg)
 	if err != nil {
 		log.Infof("main: k8s.Start: mode[%s]: %w", cfg.Server.Mode, err)
 	}
@@ -143,7 +143,7 @@ func run(log *logrus.Logger) error {
 	<-shutdown
 
 	monitor.Shutdown()
-	service.Shutdown()
+	grpc.Shutdown()
 
 	return nil
 }

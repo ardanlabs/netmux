@@ -19,12 +19,12 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Service represents a grpc proxy service.
-type Service struct {
+// GRPC implements the grpc interface.
+type GRPC struct {
 	cluster.UnsafeProxyServer
 	log                *logrus.Logger
 	auth               *auth.Auth
-	grpc               *grpc.Server
+	server             *grpc.Server
 	signal             *signal.Signal[*cluster.Bridge]
 	bridges            *db.DB[*cluster.Bridge]
 	sessions           *db.DB[string]
@@ -34,12 +34,12 @@ type Service struct {
 	reverseProxyLister net.Listener
 }
 
-// Start starts the proxy service.
-func Start(log *logrus.Logger, auth *auth.Auth) (*Service, error) {
-	srv := Service{
+// Start starts the grpc server.
+func Start(log *logrus.Logger, auth *auth.Auth) (*GRPC, error) {
+	g := GRPC{
 		log:  log,
 		auth: auth,
-		grpc: grpc.NewServer(
+		server: grpc.NewServer(
 			grpc.UnaryInterceptor(authUnaryServerInterceptor(auth)),
 			grpc.StreamInterceptor(authStreamServerInterceptor(auth)),
 		),
@@ -49,47 +49,47 @@ func Start(log *logrus.Logger, auth *auth.Auth) (*Service, error) {
 		conns:    db.New[net.Conn](db.NopReadWriter{}),
 	}
 
-	cluster.RegisterProxyServer(srv.grpc, &srv)
-
 	l, err := net.Listen("tcp", "0.0.0.0:48080")
 	if err != nil {
 		return nil, fmt.Errorf("net.Listen: %w", err)
 	}
 
-	srv.wg.Add(1)
+	cluster.RegisterProxyServer(g.server, &g)
+
+	g.wg.Add(1)
 
 	go func() {
 		log.Info("proxy: started")
 		defer func() {
 			log.Info("proxy: shutdown")
-			srv.wg.Done()
+			g.wg.Done()
 		}()
 
-		srv.log.Infof("proxy: running server at 0.0.0.0:48080")
-		srv.grpc.Serve(l)
+		g.log.Infof("proxy: running server at 0.0.0.0:48080")
+		g.server.Serve(l)
 	}()
 
-	return &srv, nil
+	return &g, nil
 }
 
 // Shutdown requests the proxy service to stop and waits.
-func (s *Service) Shutdown() {
-	s.log.Infof("proxy: starting shutdown")
-	defer s.log.Infof("proxy: shutdown")
+func (g *GRPC) Shutdown() {
+	g.log.Infof("proxy: starting shutdown")
+	defer g.log.Infof("proxy: shutdown")
 
-	s.shutdownReverseProxyListen()
-	s.grpc.GracefulStop()
+	g.shutdownReverseProxyListen()
+	g.server.GracefulStop()
 }
 
 // AddBridge adds the specified proxy bridge to the set of known bridges.
-func (s *Service) AddBridge(brd *cluster.Bridge) error {
+func (g *GRPC) AddBridge(brd *cluster.Bridge) error {
 	brd.Bridgeop = "A"
 
-	existing, err := s.bridges.Get(brd.Name)
+	existing, err := g.bridges.Get(brd.Name)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
-			s.bridges.Set(brd.Name, brd)
-			s.propagate(brd)
+			g.bridges.Set(brd.Name, brd)
+			g.propagate(brd)
 			return nil
 		}
 
@@ -97,15 +97,15 @@ func (s *Service) AddBridge(brd *cluster.Bridge) error {
 	}
 
 	if existing.K8Snamespace == brd.K8Snamespace && existing.K8Sname == brd.K8Sname && existing.K8Skind == brd.K8Skind {
-		s.bridges.Set(brd.Name, brd)
-		s.propagate(brd)
+		g.bridges.Set(brd.Name, brd)
+		g.propagate(brd)
 	}
 
 	return nil
 }
 
 // RemoveBridge removes the specified proxy bridge from the set of known bridges.
-func (s *Service) RemoveBridge(brd *cluster.Bridge) error {
+func (s *GRPC) RemoveBridge(brd *cluster.Bridge) error {
 	brd.Bridgeop = "D"
 
 	if _, err := s.bridges.Get(brd.Name); err != nil {
@@ -121,12 +121,12 @@ func (s *Service) RemoveBridge(brd *cluster.Bridge) error {
 // =============================================================================
 
 // Ver is provided to implement the ProxyServer interface.
-func (s *Service) Ver(ctx context.Context, nop *cluster.Noop) (*cluster.Noop, error) {
+func (s *GRPC) Ver(ctx context.Context, nop *cluster.Noop) (*cluster.Noop, error) {
 	return &cluster.Noop{}, nil
 }
 
 // Ping is provided to implement the ProxyServer interface.
-func (s *Service) Ping(ctx context.Context, msg *cluster.StringMsg) (*cluster.StringMsg, error) {
+func (s *GRPC) Ping(ctx context.Context, msg *cluster.StringMsg) (*cluster.StringMsg, error) {
 	resp, err := shell.Ping(msg.Msg)
 	if err != nil {
 		return nil, fmt.Errorf("shell.Ping: %w", err)
@@ -136,7 +136,7 @@ func (s *Service) Ping(ctx context.Context, msg *cluster.StringMsg) (*cluster.St
 }
 
 // PortScan is provided to implement the ProxyServer interface.
-func (s *Service) PortScan(ctx context.Context, msg *cluster.StringMsg) (*cluster.StringMsg, error) {
+func (s *GRPC) PortScan(ctx context.Context, msg *cluster.StringMsg) (*cluster.StringMsg, error) {
 	resp, err := shell.Nmap(msg.Msg)
 	if err != nil {
 		return nil, fmt.Errorf("shell.Nmap: %w", err)
@@ -146,7 +146,7 @@ func (s *Service) PortScan(ctx context.Context, msg *cluster.StringMsg) (*cluste
 }
 
 // Nc is provided to implement the ProxyServer interface.
-func (s *Service) Nc(ctx context.Context, msg *cluster.StringMsg) (*cluster.StringMsg, error) {
+func (s *GRPC) Nc(ctx context.Context, msg *cluster.StringMsg) (*cluster.StringMsg, error) {
 	resp, err := shell.Netcat(msg.Msg) //cmd.Netcat(req.Msg)
 	if err != nil {
 		return nil, fmt.Errorf("shell.Netcat: %w", err)
@@ -156,7 +156,7 @@ func (s *Service) Nc(ctx context.Context, msg *cluster.StringMsg) (*cluster.Stri
 }
 
 // SpeedTest is provided to implement the ProxyServer interface.
-func (s *Service) SpeedTest(ctx context.Context, msg *cluster.StringMsg) (*cluster.BytesMsg, error) {
+func (s *GRPC) SpeedTest(ctx context.Context, msg *cluster.StringMsg) (*cluster.BytesMsg, error) {
 	numOfBytes, err := humanize.ParseBytes(msg.Msg)
 	if err != nil {
 		return nil, fmt.Errorf("humanize.ParseBytes: %w", err)
@@ -169,7 +169,7 @@ func (s *Service) SpeedTest(ctx context.Context, msg *cluster.StringMsg) (*clust
 }
 
 // KeepAlive is provided to implement the ProxyServer interface.
-func (s *Service) KeepAlive(nop *cluster.Noop, keepAliveServer cluster.Cluster_KeepAliveServer) error {
+func (s *GRPC) KeepAlive(nop *cluster.Noop, keepAliveServer cluster.Cluster_KeepAliveServer) error {
 	// TODO: Review this code.
 
 	for {
@@ -179,7 +179,7 @@ func (s *Service) KeepAlive(nop *cluster.Noop, keepAliveServer cluster.Cluster_K
 }
 
 // GetConfigs is provided to implement the ProxyServer interface.
-func (s *Service) GetConfigs(ctx context.Context, nop *cluster.Noop) (*cluster.Bridges, error) {
+func (s *GRPC) GetConfigs(ctx context.Context, nop *cluster.Noop) (*cluster.Bridges, error) {
 	brds := cluster.Bridges{
 		Eps: s.bridges.KeyValues().Values(),
 	}
@@ -188,7 +188,7 @@ func (s *Service) GetConfigs(ctx context.Context, nop *cluster.Noop) (*cluster.B
 }
 
 // StreamConfig is provided to implement the ProxyServer interface.
-func (s *Service) StreamConfig(nop *cluster.Noop, streamConfigServer cluster.Cluster_StreamConfigServer) error {
+func (s *GRPC) StreamConfig(nop *cluster.Noop, streamConfigServer cluster.Cluster_StreamConfigServer) error {
 	brds := cluster.Bridges{
 		Eps: s.bridges.KeyValues().Values(),
 	}
@@ -217,7 +217,7 @@ func (s *Service) StreamConfig(nop *cluster.Noop, streamConfigServer cluster.Clu
 }
 
 // Login is provided to implement the ProxyServer interface.
-func (s *Service) Login(ctx context.Context, loginReq *cluster.LoginReq) (*cluster.StringMsg, error) {
+func (s *GRPC) Login(ctx context.Context, loginReq *cluster.LoginReq) (*cluster.StringMsg, error) {
 	s.log.Infof("login: %s", loginReq.User)
 
 	userID, err := s.auth.Login(loginReq.User, loginReq.Pass)
@@ -229,7 +229,7 @@ func (s *Service) Login(ctx context.Context, loginReq *cluster.LoginReq) (*clust
 }
 
 // Logout is provided to implement the ProxyServer interface.
-func (s *Service) Logout(ctx context.Context, msg *cluster.StringMsg) (*cluster.Noop, error) {
+func (s *GRPC) Logout(ctx context.Context, msg *cluster.StringMsg) (*cluster.Noop, error) {
 	if err := s.auth.Logout(msg.Msg); err != nil {
 		return nil, fmt.Errorf("auth.Logout: %w", err)
 	}
@@ -240,7 +240,7 @@ func (s *Service) Logout(ctx context.Context, msg *cluster.StringMsg) (*cluster.
 // =============================================================================
 
 // propagate broadcasts the brd to the G's that are listening.
-func (s *Service) propagate(brd *cluster.Bridge) error {
+func (s *GRPC) propagate(brd *cluster.Bridge) error {
 	s.log.Infof("service: propagate: Name[%s] Bridgeop[%s]", brd.Name, brd.Bridgeop)
 
 	f := func(k string, brd *cluster.Bridge) error {

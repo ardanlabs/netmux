@@ -5,61 +5,119 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/user"
+	"sync"
 	"time"
 
-	"github.com/ardanlabs.com/netmux/app/services/local/service"
+	server "github.com/ardanlabs.com/netmux/app/services/local/cluster"
 	"github.com/ardanlabs.com/netmux/business/grpc/cluster"
 	"github.com/ardanlabs.com/netmux/business/grpc/local"
 	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs.com/netmux/foundation/hosts"
 	"github.com/ardanlabs.com/netmux/foundation/signal"
-	"github.com/natefinch/lumberjack"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
-const (
-	eventTypeDisconnected = "disconnected"
-	eventTypeConnected    = "connected"
-	eventKATimeOut        = "katimeout"
-)
-
-type event struct {
-	Type    string
-	Ctx     string
-	Payload any
+// GRPC implements the grpc interface.
+type GRPC struct {
+	local.UnsafeLocalServer
+	log     *logrus.Logger
+	user    *user.User
+	cluster *server.Cluster
+	local   *grpc.Server
+	signal  *signal.Signal[event]
+	hosts   *hosts.Hosts
+	wg      sync.WaitGroup
 }
 
-func (e *event) PayloadJson() []byte {
-	bs, _ := json.Marshal(e.Payload)
-	return bs
+// Start starts the grpc server.
+func Start(log *logrus.Logger, user *user.User, cluster *server.Cluster) (*GRPC, error) {
+	grpc := GRPC{
+		log:     log,
+		user:    user,
+		cluster: cluster,
+		local:   grpc.NewServer(),
+		signal:  signal.New[event](),
+		hosts:   hosts.New(),
+	}
+
+	os.RemoveAll(server.Sock)
+	l, err := net.Listen("unix", server.Sock)
+	if err != nil {
+		return nil, fmt.Errorf("net.Listen: %w", err)
+	}
+
+	if err := os.Chmod(server.Sock, 0777); err != nil {
+		return nil, fmt.Errorf("os.Chmod: %w", err)
+	}
+
+	local.RegisterLocalServer(grpc.local, &grpc)
+
+	grpc.wg.Add(1)
+
+	go func() {
+		log.Info("grpc: started")
+		defer func() {
+			log.Info("grpc: shutdown")
+			grpc.wg.Done()
+		}()
+
+		grpc.log.Infof("grpc: running server at 0.0.0.0:48080")
+		grpc.local.Serve(l)
+	}()
+
+	return &grpc, nil
+}
+
+// Shutdown requests the proxy service to stop and waits.
+func (g *GRPC) Shutdown() {
+	g.log.Infof("grpc: starting shutdown")
+	defer g.log.Infof("grpc: shutdown")
+
+	g.local.GracefulStop()
 }
 
 // =============================================================================
 
-type server struct {
-	local.UnsafeLocalServer
-	signal *signal.Signal[event]
-	hosts  *hosts.Hosts
-}
+/*
+  rpc SetConfig(StringMsg) returns(Noop){}
+  rpc GetConfig(Noop) returns(StringMsg){}
 
-func (s *server) Load(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	_, err := os.Stat(req.Msg)
-	if err != nil {
-		return nil, err
-	}
-	service.Default().Load(req.Msg)
-	return &local.Noop{}, nil
-}
+  rpc Connect(StringMsg) returns (Noop){}
+  rpc Disconnect(StringMsg) returns (Noop){}
+  rpc PfOn(StringMsg) returns (Noop){}
+  rpc PfOff(StringMsg) returns (Noop){}
+  rpc StartSvc(SvcRequest) returns (Noop){}
+  rpc StopSvc(SvcRequest) returns (Noop){}
+  rpc ResetHosts(Noop) returns(Noop){}
+  rpc SpeedTest(StringMsg) returns (StringMsg){}
 
-func (s *server) SetConfig(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	logrus.Infof("Loading config from: %s", req.Msg)
-	service.Reset()
+  rpc Load(StringMsg) returns(Noop){}
+  rpc Exit(Noop) returns(Noop){}
+
+  rpc ClusterInstall(ClusterInstallReq) returns (Noop){}
+  rpc ClusterUninstall(StringMsg) returns (Noop){}
+
+  rpc Login(LoginMessage) returns(StringMsg){}
+  rpc Logout(StringMsg) returns(Noop){}
+
+  rpc Config(Noop) returns(BytesMsg){}
+  rpc Status(StringMsg) returns(StatusResponse){}
+  rpc Monitor(Noop) returns(stream StringMsg){}
+  rpc Events(Noop)  returns(stream EventMsg){}
+
+  rpc Ping(StringMsg) returns(StringMsg){}
+  rpc PortScan(StringMsg) returns(StringMsg){}
+  rpc Nc(StringMsg) returns(StringMsg){}
+*/
+
+func (g *GRPC) SetConfig(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	g.log.Infof("Loading config from: %s", req.Msg)
+	g.cluster.Reset()
 
 	cfg, err := nmconfig.Load()
 	if err != nil {
@@ -70,14 +128,23 @@ func (s *server) SetConfig(ctx context.Context, req *local.StringMsg) (*local.No
 		return nil, err
 	}
 
-	if err := service.Default().Load(req.Msg); err != nil {
+	if err := g.cluster.Load(req.Msg); err != nil {
 		return nil, err
 	}
 
 	return &local.Noop{}, err
 }
 
-func (s *server) GetConfig(ctx context.Context, req *local.Noop) (*local.StringMsg, error) {
+func (g *GRPC) Load(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	_, err := os.Stat(req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	g.cluster.Load(req.Msg)
+	return &local.Noop{}, nil
+}
+
+func (g *GRPC) GetConfig(ctx context.Context, req *local.Noop) (*local.StringMsg, error) {
 	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
@@ -88,8 +155,8 @@ func (s *server) GetConfig(ctx context.Context, req *local.Noop) (*local.StringM
 	return res, nil
 }
 
-func (s *server) Connect(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(req.Msg)
+func (g *GRPC) Connect(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(req.Msg)
 
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -135,7 +202,7 @@ func (s *server) Connect(ctx context.Context, req *local.StringMsg) (*local.Noop
 		go func() {
 			for nErr < 5 {
 				<-t.C
-				s.signal.Broadcast(event{
+				g.signal.Broadcast(event{
 					Type:    eventKATimeOut,
 					Ctx:     nxctx.Name,
 					Payload: "Timeout for keepalive",
@@ -148,7 +215,7 @@ func (s *server) Connect(ctx context.Context, req *local.StringMsg) (*local.Noop
 			_, err = ka.Recv()
 			if err != nil {
 				nErr++
-				s.signal.Broadcast(event{
+				g.signal.Broadcast(event{
 					Type:    eventTypeDisconnected,
 					Ctx:     nxctx.Name,
 					Payload: fmt.Sprintf("Disconnected: %s", err.Error()),
@@ -161,7 +228,7 @@ func (s *server) Connect(ctx context.Context, req *local.StringMsg) (*local.Noop
 		}
 	}()
 
-	s.signal.Broadcast(event{
+	g.signal.Broadcast(event{
 		Type:    eventTypeConnected,
 		Ctx:     req.Msg,
 		Payload: "connected at: " + time.Now().String(),
@@ -170,37 +237,37 @@ func (s *server) Connect(ctx context.Context, req *local.StringMsg) (*local.Noop
 	return &local.Noop{}, err
 }
 
-func (s *server) Disconnect(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(req.Msg)
+func (g *GRPC) Disconnect(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
 	nxctx.Stop()
-	nxctx.Services = make([]*service.Service, 0)
+	nxctx.Services = make([]*server.Cluster, 0)
 
 	return &local.Noop{}, nil
 }
 
-func (s *server) ClusterInstall(ctx context.Context, req *local.ClusterInstallReq) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(req.Nxctx)
+func (g *GRPC) ClusterInstall(ctx context.Context, req *local.ClusterInstallReq) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(req.Nxctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
-	err := service.DefaultK8sController().SetupDeploy(ctx, nxctx, req.Ns, req.Kctx, req.Arch)
+	err := g.cluster.DefaultK8sController().SetupDeploy(ctx, nxctx, req.Ns, req.Kctx, req.Arch)
 	return &local.Noop{}, err
 }
 
-func (s *server) ClusterUninstall(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(*req.Ctx)
+func (g *GRPC) ClusterUninstall(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
-	err := service.DefaultK8sController().TearDownDeploy(ctx, nxctx)
+	err := g.cluster.DefaultK8sController().TearDownDeploy(ctx, nxctx)
 	return &local.Noop{}, err
 }
 
-func (s *server) PfOn(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(*req.Ctx)
+func (g *GRPC) PfOn(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
@@ -211,8 +278,8 @@ func (s *server) PfOn(ctx context.Context, req *local.StringMsg) (*local.Noop, e
 	return &local.Noop{}, err
 }
 
-func (s *server) PfOff(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(*req.Ctx)
+func (g *GRPC) PfOff(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
@@ -223,8 +290,8 @@ func (s *server) PfOff(ctx context.Context, req *local.StringMsg) (*local.Noop, 
 	return &local.Noop{}, err
 }
 
-func (s *server) Login(ctx context.Context, req *local.LoginMessage) (*local.StringMsg, error) {
-	nxctx := service.Default().CtxByName(req.Context)
+func (g *GRPC) Login(ctx context.Context, req *local.LoginMessage) (*local.StringMsg, error) {
+	nxctx := g.cluster.CtxByName(req.Context)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Context)
 	}
@@ -246,8 +313,8 @@ func (s *server) Login(ctx context.Context, req *local.LoginMessage) (*local.Str
 	return &local.StringMsg{Msg: "ok"}, nil
 }
 
-func (s *server) Logout(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(req.Msg)
+func (g *GRPC) Logout(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Msg)
 	}
@@ -268,13 +335,13 @@ func (s *server) Logout(ctx context.Context, req *local.StringMsg) (*local.Noop,
 	return &local.Noop{}, nil
 }
 
-func (s *server) ResetHosts(ctx context.Context, req *local.Noop) (*local.Noop, error) {
-	s.hosts.Remove("nx: ctx")
+func (g *GRPC) ResetHosts(ctx context.Context, req *local.Noop) (*local.Noop, error) {
+	g.hosts.Remove("nx: ctx")
 	return &local.Noop{}, nil
 }
 
-func (s *server) StartSvc(ctx context.Context, req *local.SvcRequest) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(req.Ctx)
+func (g *GRPC) StartSvc(ctx context.Context, req *local.SvcRequest) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
 	}
@@ -298,8 +365,8 @@ func (s *server) StartSvc(ctx context.Context, req *local.SvcRequest) (*local.No
 	return &local.Noop{}, nil
 }
 
-func (s *server) StopSvc(ctx context.Context, req *local.SvcRequest) (*local.Noop, error) {
-	nxctx := service.Default().CtxByName(req.Ctx)
+func (g *GRPC) StopSvc(ctx context.Context, req *local.SvcRequest) (*local.Noop, error) {
+	nxctx := g.cluster.CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
 	}
@@ -317,14 +384,14 @@ func (s *server) StopSvc(ctx context.Context, req *local.SvcRequest) (*local.Noo
 	return &local.Noop{}, nil
 }
 
-func (s *server) Exit(ctx context.Context, req *local.Noop) (*local.Noop, error) {
+func (g *GRPC) Exit(ctx context.Context, req *local.Noop) (*local.Noop, error) {
 	os.Exit(0)
 	return nil, nil
 }
 
-func (s *server) Monitor(req *local.Noop, res local.Local_MonitorServer) error {
+func (g *GRPC) Monitor(req *local.Noop, res local.Local_MonitorServer) error {
 	for {
-		bs, _ := json.Marshal(service.Default())
+		bs, _ := json.Marshal(g.cluster)
 		err := res.Send(&local.StringMsg{Msg: string(bs)})
 		if err != nil {
 			return err
@@ -333,8 +400,8 @@ func (s *server) Monitor(req *local.Noop, res local.Local_MonitorServer) error {
 	}
 }
 
-func (s *server) Events(req *local.Noop, res local.Local_EventsServer) error {
-	chn := s.signal.Aquire()
+func (g *GRPC) Events(req *local.Noop, res local.Local_EventsServer) error {
+	chn := g.signal.Aquire()
 
 	for {
 		evt, ok := <-chn
@@ -350,7 +417,7 @@ func (s *server) Events(req *local.Noop, res local.Local_EventsServer) error {
 	}
 }
 
-func buildStatus(resetCounters bool) (*local.StatusResponse, error) {
+func (g *GRPC) buildStatus(resetCounters bool) (*local.StatusResponse, error) {
 	var ret = local.StatusResponse{}
 
 	cfg, err := nmconfig.Load()
@@ -359,10 +426,10 @@ func buildStatus(resetCounters bool) (*local.StatusResponse, error) {
 	}
 
 	ret.Fname = cfg.FileName()
-	ret.Version = service.Ver + " - " + service.Semver
+	// ret.Version = g.cluster.Ver + " - " + g.cluster.Semver
 
-	for i := range service.Default().Contexts {
-		actx := service.Default().Contexts[i]
+	for i := range g.cluster.Contexts {
+		actx := g.cluster.Contexts[i]
 		ctx := &local.ContextStatusResponse{}
 		ctx.Name = actx.Name
 		ctx.Status = string(actx.Status)
@@ -393,14 +460,14 @@ func buildStatus(resetCounters bool) (*local.StatusResponse, error) {
 	}
 
 	if resetCounters {
-		service.Default().ResetCounters()
+		g.cluster.ResetCounters()
 	}
 
 	return &ret, nil
 }
 
-func (s *server) Status(_ context.Context, req *local.StringMsg) (*local.StatusResponse, error) {
-	res, err := buildStatus(req.Msg == "zero")
+func (g *GRPC) Status(_ context.Context, req *local.StringMsg) (*local.StatusResponse, error) {
+	res, err := g.buildStatus(req.Msg == "zero")
 	if err != nil {
 		return nil, err
 	}
@@ -408,12 +475,12 @@ func (s *server) Status(_ context.Context, req *local.StringMsg) (*local.StatusR
 	return res, nil
 
 }
-func (s *server) Ping(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
+func (g *GRPC) Ping(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
 
-	nxctx := service.Default().CtxByName(*req.Ctx)
+	nxctx := g.cluster.CtxByName(*req.Ctx)
 
 	if nxctx == nil {
 		return nil, fmt.Errorf("context %s not found", ctx)
@@ -432,12 +499,12 @@ func (s *server) Ping(ctx context.Context, req *local.StringMsg) (*local.StringM
 
 	return &local.StringMsg{Msg: res.Msg}, nil
 }
-func (s *server) PortScan(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
+func (g *GRPC) PortScan(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
 
-	nxctx := service.Default().CtxByName(*req.Ctx)
+	nxctx := g.cluster.CtxByName(*req.Ctx)
 
 	if nxctx == nil {
 		return nil, fmt.Errorf("context %s not found", ctx)
@@ -456,8 +523,8 @@ func (s *server) PortScan(ctx context.Context, req *local.StringMsg) (*local.Str
 
 	return &local.StringMsg{Msg: res.Msg}, nil
 }
-func (s *server) SpeedTest(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
-	nxctx := service.Default().CtxByName(*req.Ctx)
+func (g *GRPC) SpeedTest(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
+	nxctx := g.cluster.CtxByName(*req.Ctx)
 
 	if nxctx == nil {
 		return nil, fmt.Errorf("context %s not found", ctx)
@@ -482,8 +549,8 @@ func (s *server) SpeedTest(ctx context.Context, req *local.StringMsg) (*local.St
 		len(res.Msg),
 	)}, nil
 }
-func (s *server) Config(context.Context, *local.Noop) (*local.BytesMsg, error) {
-	bs, err := json.Marshal(service.Default())
+func (g *GRPC) Config(context.Context, *local.Noop) (*local.BytesMsg, error) {
+	bs, err := json.Marshal(g.cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -491,12 +558,12 @@ func (s *server) Config(context.Context, *local.Noop) (*local.BytesMsg, error) {
 	return ret, nil
 }
 
-func (s *server) Nc(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
+func (g *GRPC) Nc(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
 
-	nxctx := service.Default().CtxByName(*req.Ctx)
+	nxctx := g.cluster.CtxByName(*req.Ctx)
 
 	if nxctx == nil {
 		return nil, fmt.Errorf("context %s not found", ctx)
@@ -514,78 +581,4 @@ func (s *server) Nc(ctx context.Context, req *local.StringMsg) (*local.StringMsg
 	}
 
 	return &local.StringMsg{Msg: res.Msg}, nil
-}
-
-func Run(actuser *user.User) error {
-
-	lblog := &lumberjack.Logger{
-		Filename:   "/tmp/netmux.log",
-		MaxSize:    500, // megabytes
-		MaxBackups: 3,
-		MaxAge:     28,    //days
-		Compress:   false, // disabled by default
-	}
-	log.SetOutput(lblog)
-	logrus.SetOutput(lblog)
-
-	logrus.Infof("Starting server: %s / %s", service.Default().Semver, service.Default().Semver)
-
-	logrus.Infof("Running server as: %s", actuser.Username)
-	cfgSource := os.Getenv("CONFIG")
-	if cfgSource == "" {
-		cfgSource = "/etc/netmux.yaml"
-	}
-
-	cfg, err := nmconfig.LoadFile(cfgSource)
-	if err != nil {
-		return err
-	}
-
-	fName := cfg.FileName()
-
-	if fName != "" {
-		logrus.Infof("Using config: %s", fName)
-		count := 0
-		for {
-			_, err := os.Stat(fName)
-			if err == nil {
-				logrus.Infof("Loading config: %s", fName)
-				service.Default().Load(fName)
-
-				break
-			}
-			if err != nil {
-				logrus.Warnf("couldnt load config - will give it a new try")
-				count++
-				time.Sleep(time.Second)
-				continue
-			}
-			if count == 30 {
-				logrus.Warnf("couldnt load config for 30 times - aborting")
-				panic("couldnt load config")
-			}
-		}
-
-	}
-
-	_ = os.RemoveAll(service.Sock)
-	l, err := net.Listen("unix", service.Sock)
-	if err != nil {
-		return err
-	}
-	err = os.Chmod(service.Sock, 0777)
-	if err != nil {
-		return err
-	}
-
-	srv := server{
-		signal: signal.New[event](),
-		hosts:  hosts.New(),
-	}
-	defer srv.signal.Shutdown()
-
-	grpcServer := grpc.NewServer()
-	local.RegisterLocalServer(grpcServer, &srv)
-
-	return grpcServer.Serve(l)
 }

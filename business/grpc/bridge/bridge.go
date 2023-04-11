@@ -9,19 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Set of bridge types.
-const (
-	DirectionForward = "F"
-	DirectionReward  = "R"
-)
-
-// Set of protocols.
-const (
-	ProtoTCP  = "tcp"
-	ProtoTCP4 = "tcp4"
-	ProtoTCP6 = "tcp6"
-)
-
 // =============================================================================
 
 // Bridges represetns a collection of bridge values.
@@ -35,16 +22,6 @@ func LoadBridges(annotation string) (Bridges, error) {
 		return nil, err
 	}
 
-	for _, b := range bs {
-		if b.Direction == "" {
-			b.Direction = DirectionForward
-		}
-
-		if b.Proto == "" {
-			b.Proto = ProtoTCP
-		}
-	}
-
 	return bs, nil
 }
 
@@ -52,29 +29,41 @@ func LoadBridges(annotation string) (Bridges, error) {
 
 // Bridge represents a networking bridge.
 type Bridge struct {
-	Name       string `yaml:"name"`
-	LocalHost  string `yaml:"localHost"`
-	LocalPort  string `yaml:"localPort"`
-	RemoteHost string `yaml:"remoteHost"`
-	RemotePort string `yaml:"remotePort"`
-	Proto      string `yaml:"proto"`
-	Direction  string `yaml:"direction"`
-	Auto       bool   `yaml:"auto"`
+	Name       string    `yaml:"name"`
+	LocalHost  string    `yaml:"localHost"`
+	LocalPort  string    `yaml:"localPort"`
+	RemoteHost string    `yaml:"remoteHost"`
+	RemotePort string    `yaml:"remotePort"`
+	Protocol   Protocol  `yaml:"proto"`
+	Direction  Direction `yaml:"direction"`
+	Auto       bool      `yaml:"auto"`
 }
 
 // New converts the specified cluster bridge value and marshals it
 // into a bridge value.
-func New(proxy *cluster.Bridge) Bridge {
-	return Bridge{
+func New(proxy *cluster.Bridge) (Bridge, error) {
+	direction, err := ParseDirection(proxy.Direction)
+	if err != nil {
+		return Bridge{}, err
+	}
+
+	protocol, err := ParseProtocol(proxy.Proto)
+	if err != nil {
+		return Bridge{}, err
+	}
+
+	b := Bridge{
 		LocalPort:  proxy.Localport,
 		LocalHost:  proxy.Localaddr,
 		RemotePort: proxy.Remoteport,
 		RemoteHost: proxy.Remoteaddr,
-		Proto:      proxy.Proto,
 		Name:       proxy.Name,
-		Direction:  proxy.Direction,
+		Protocol:   protocol,
+		Direction:  direction,
 		Auto:       proxy.Auto,
 	}
+
+	return b, nil
 }
 
 // NewClusterBridge converts the specified bridge value and marshals it into
@@ -85,9 +74,9 @@ func NewClusterBridge(b Bridge) *cluster.Bridge {
 		Localaddr:  b.LocalHost,
 		Remoteport: b.RemotePort,
 		Remoteaddr: b.RemoteHost,
-		Proto:      b.Proto,
 		Name:       b.Name,
-		Direction:  b.Direction,
+		Proto:      b.Protocol.name,
+		Direction:  b.Direction.name,
 		Auto:       b.Auto,
 	}
 }
@@ -118,7 +107,7 @@ func (b Bridge) IsZero() bool {
 
 // LocalListener announces on the configured local network.
 func (b Bridge) LocalListener() (net.Listener, error) {
-	lsn, err := net.Listen(b.Proto, b.localHostPort())
+	lsn, err := net.Listen(b.Protocol.name, b.localHostPort())
 	if err != nil {
 		return nil, fmt.Errorf("local listener: %w", err)
 	}
@@ -128,7 +117,7 @@ func (b Bridge) LocalListener() (net.Listener, error) {
 
 // RemoteListener announces on the configured remote network.
 func (b Bridge) RemoteListener() (net.Listener, error) {
-	lsn, err := net.Listen(b.Proto, b.remoteHostPort())
+	lsn, err := net.Listen(b.Protocol.name, b.remoteHostPort())
 	if err != nil {
 		return nil, fmt.Errorf("remote listener: %w", err)
 	}
@@ -138,7 +127,7 @@ func (b Bridge) RemoteListener() (net.Listener, error) {
 
 // RemotePortListener announces on the configured remote network port.
 func (b Bridge) RemotePortListener() (net.Listener, error) {
-	lsn, err := net.Listen(b.Proto, ":"+b.RemotePort)
+	lsn, err := net.Listen(b.Protocol.name, ":"+b.RemotePort)
 	if err != nil {
 		return nil, fmt.Errorf("remote port listener: %w", err)
 	}
@@ -148,12 +137,12 @@ func (b Bridge) RemotePortListener() (net.Listener, error) {
 
 // LocalDial connects to the configured local network.
 func (b Bridge) LocalDial() (net.Conn, error) {
-	return net.Dial(b.Proto, b.localHostPort())
+	return net.Dial(b.Protocol.name, b.localHostPort())
 }
 
 // RemoteDial connects to the configured remote network.
 func (b Bridge) RemoteDial() (net.Conn, error) {
-	return net.Dial(b.Proto, b.remoteHostPort())
+	return net.Dial(b.Protocol.name, b.remoteHostPort())
 }
 
 // =============================================================================

@@ -1,4 +1,4 @@
-package service
+package cluster
 
 import (
 	"context"
@@ -7,9 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
 	"github.com/ardanlabs.com/netmux/business/grpc/cluster"
-	"github.com/ardanlabs.com/netmux/foundation/hosts"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +21,7 @@ type Context struct {
 
 	Enabled           bool       `yaml:"enabled"`
 	Name              string     `yaml:"name"`
-	Services          []*Service `yaml:"services"`
+	Clusters          []*Cluster `yaml:"services"`
 	Url               string     `yaml:"url"`
 	Key               string     `yaml:"key"`
 	Runtime           Runtime    `yaml:"runtime"`
@@ -55,24 +53,24 @@ func (c *Context) Prepare(cfg *Netmux) error {
 		return err
 	}
 	c.Runtime.Prepare(c)
-	for _, v := range c.Services {
-		v.Prepare(c)
-	}
+	// for _, v := range c.Clusters {
+	// 	v.Prepare(c)
+	// }
 	c.PortForwardStatus = StatusStopped
 	c.Status = StatusStopped
 	return nil
 }
 
 func (c *Context) markContextDisabled() error {
-	for _, s := range c.Services {
-		s.Status = StatusDisabled
+	for _, s := range c.Clusters {
+		s.stats.status = StatusDisabled
 	}
 	return nil
 
 }
 
 func (c *Context) ResetCounters() {
-	for _, v := range c.Services {
+	for _, v := range c.Clusters {
 		v.ResetCounters()
 	}
 	c.Sent = 0
@@ -138,23 +136,21 @@ func (c *Context) onBridgeChange(ctx context.Context, bs *cluster.Bridges) error
 				c.DelSvcByName(e.Name)
 			}
 
-			svc = &Service{
-				parent: c,
-				Bridge: bridge.New(e),
-				hosts:  hosts.New(),
-			}
+			// svc = &Cluster{
+			// 	parent: c,
+			// 	bridge: bridge.New(e),
+			// 	hosts:  hosts.New(),
+			// }
 
-			svc.ctx, svc.cancel = context.WithCancel(c.ctx)
-			if svc.Bridge.Auto {
-				err := svc.Start()
-				if err != nil {
-					return err
-				}
-			}
-			c.Services = append(c.Services, svc)
-
+			// svc.ctx, svc.cancel = context.WithCancel(c.ctx)
+			// if svc.Bridge.Auto {
+			// 	err := svc.Start()
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// }
+			// c.Clusters = append(c.Clusters, svc)
 		}
-
 	}
 
 	return nil
@@ -243,10 +239,10 @@ func (c *Context) Stop() error {
 		c.cancel()
 	}
 	logrus.Infof("Stopping context: %s", c.Name)
-	for _, s := range c.Services {
+	for _, s := range c.Clusters {
 		err := s.Stop()
 		if err != nil {
-			logrus.Warnf("Error closing service %s: %s", s.Name(), err.Error())
+			logrus.Warnf("Error closing service %s: %s", s.bridge.Name, err.Error())
 		}
 
 	}
@@ -301,10 +297,10 @@ func (c *Context) Logout() error {
 	return nil
 }
 
-func (c *Context) SvcByName(n string) *Service {
-	for i := range c.Services {
-		svc := c.Services[i]
-		if svc.Name() == n {
+func (c *Context) SvcByName(n string) *Cluster {
+	for i := range c.Clusters {
+		svc := c.Clusters[i]
+		if svc.bridge.Name == n {
 			return svc
 		}
 	}
@@ -312,11 +308,11 @@ func (c *Context) SvcByName(n string) *Service {
 }
 
 func (c *Context) DelSvcByName(n string) {
-	for i := range c.Services {
-		svc := c.Services[i]
-		if svc.Name() == n {
-			c.Services[i] = c.Services[len(c.Services)-1]
-			c.Services = c.Services[:len(c.Services)-1]
+	for i := range c.Clusters {
+		svc := c.Clusters[i]
+		if svc.bridge.Name == n {
+			c.Clusters[i] = c.Clusters[len(c.Clusters)-1]
+			c.Clusters = c.Clusters[:len(c.Clusters)-1]
 			return
 		}
 	}

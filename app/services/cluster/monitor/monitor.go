@@ -45,20 +45,20 @@ type Config struct {
 // Monitor represents an API for working with Kubernetes.
 type Monitor struct {
 	log      *logrus.Logger
-	service  *grpc.Service
+	grpc     *grpc.GRPC
 	wg       sync.WaitGroup
 	shutdown context.CancelFunc
 }
 
 // Start starts the k8s support for connecting, watching and creating abstractions
 // in kubernetes.
-func Start(log *logrus.Logger, service *grpc.Service, cfg Config) (*Monitor, error) {
+func Start(log *logrus.Logger, grpc *grpc.GRPC, cfg Config) (*Monitor, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	mnt := Monitor{
 		log:      log,
-		service:  service,
+		grpc:     grpc,
 		shutdown: cancel,
 	}
 
@@ -216,15 +216,15 @@ func (mnt *Monitor) k8sPod(ctx context.Context, evtType watch.EventType, pod *co
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("pod: added bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("pod: delete bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Modified:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("pod: modified bridge: brd.Name[%s]", brd.Name)
 		}
 	}
@@ -293,15 +293,15 @@ func (mnt *Monitor) k8sService(ctx context.Context, evtType watch.EventType, ser
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("service: added bridge: prxBrd.Name[%s]", prxBrd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("service: delete bridge: prxBrd.Name[%s]", prxBrd.Name)
 
 		case watch.Modified:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("service: modified bridge: prxBrd.Name[%s]", prxBrd.Name)
 		}
 	}
@@ -359,15 +359,15 @@ func (mnt *Monitor) k8sDeployment(ctx context.Context, evtType watch.EventType, 
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("deployment: added bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("deployment: delete bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Modified:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("deployment: modified bridge: brd.Name[%s]", brd.Name)
 		}
 	}
@@ -425,15 +425,15 @@ func (mnt *Monitor) k8sStatefulSets(ctx context.Context, evtType watch.EventType
 
 		switch evtType {
 		case watch.Added:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("statefulSets: added bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Deleted:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("statefulSets: delete bridge: brd.Name[%s]", brd.Name)
 
 		case watch.Modified:
-			mnt.service.AddBridge(prxBrd)
+			mnt.grpc.AddBridge(prxBrd)
 			mnt.log.Infof("statefulSets: modified bridge: brd.Name[%s]", brd.Name)
 		}
 	}

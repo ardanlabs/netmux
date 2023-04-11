@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ardanlabs.com/netmux/app/services/local/grpc"
 	"github.com/ardanlabs.com/netmux/business/grpc/local"
 )
 
 func server() error {
 
-	return grpc.Run(actuser)
+	//return grpc.Start(actuser)
+	return nil
 
 }
 
