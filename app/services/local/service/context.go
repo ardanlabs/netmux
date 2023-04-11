@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
-	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/business/grpc/cluster"
 	"github.com/ardanlabs.com/netmux/foundation/hosts"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +34,7 @@ type Context struct {
 	PortForwardProcess        *os.Process `yaml:"-"`
 	PortForwardStatus         Status
 	uuidPortForwardTerminator string
-	cli                       proxy.ProxyClient
+	cli                       cluster.ClusterClient
 	Token                     string
 	NConns                    int
 	Sent                      int64
@@ -43,7 +43,7 @@ type Context struct {
 	Status                    Status
 }
 
-func (c *Context) Cli() proxy.ProxyClient {
+func (c *Context) Cli() cluster.ClusterClient {
 	return c.cli
 }
 
@@ -120,7 +120,7 @@ func (c *Context) StopPortForwarding() error {
 	return nil
 }
 
-func (c *Context) onBridgeChange(ctx context.Context, bs *proxy.Bridges) error {
+func (c *Context) onBridgeChange(ctx context.Context, bs *cluster.Bridges) error {
 	for _, e := range bs.Eps {
 		e := e
 		switch e.Bridgeop {
@@ -194,7 +194,7 @@ func (c *Context) Start(ctx context.Context, chReady chan struct{}) error {
 
 	}
 
-	c.cli, err = proxy.NewClient(c.UrlAsUrl.Host, c.Token)
+	c.cli, err = cluster.NewClient(c.UrlAsUrl.Host, c.Token)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (c *Context) Start(ctx context.Context, chReady chan struct{}) error {
 }
 func (c *Context) monitorBridges() error {
 
-	stream, err := c.cli.StreamConfig(c.ctx, &proxy.Noop{})
+	stream, err := c.cli.StreamConfig(c.ctx, &cluster.Noop{})
 	if err != nil {
 		return err
 	}
@@ -264,11 +264,11 @@ func (c *Context) Login(user string, pass string) (string, error) {
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.cli, err = proxy.NewClient(c.UrlAsUrl.Host, "")
+	c.cli, err = cluster.NewClient(c.UrlAsUrl.Host, "")
 	if err != nil {
 		return "", err
 	}
-	res, err := c.cli.Login(c.ctx, &proxy.LoginReq{
+	res, err := c.cli.Login(c.ctx, &cluster.LoginReq{
 		User: user,
 		Pass: pass,
 	})
@@ -290,11 +290,11 @@ func (c *Context) Logout() error {
 	}
 	var err error
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	c.cli, err = proxy.NewClient(c.UrlAsUrl.Host, c.Token)
+	c.cli, err = cluster.NewClient(c.UrlAsUrl.Host, c.Token)
 	if err != nil {
 		return err
 	}
-	_, err = c.cli.Logout(c.ctx, &proxy.StringMsg{Msg: c.Token})
+	_, err = c.cli.Logout(c.ctx, &cluster.StringMsg{Msg: c.Token})
 	if err != nil {
 		return err
 	}

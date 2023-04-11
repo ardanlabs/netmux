@@ -335,7 +335,7 @@ type LocalServer interface {
 	Ping(context.Context, *StringMsg) (*StringMsg, error)
 	PortScan(context.Context, *StringMsg) (*StringMsg, error)
 	Nc(context.Context, *StringMsg) (*StringMsg, error)
-	mustEmbedUnimplementedAgentServer()
+	mustEmbedUnimplementedLocalServer()
 }
 
 // UnimplementedAgentServer must be embedded to have forward compatible implementations.

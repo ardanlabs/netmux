@@ -8,7 +8,7 @@ import (
 	"net"
 
 	"github.com/ardanlabs.com/netmux/business/grpc/bridge"
-	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/business/grpc/cluster"
 	"github.com/ardanlabs.com/netmux/foundation/hosts"
 	"github.com/ardanlabs.com/netmux/foundation/shell"
 	"github.com/sirupsen/logrus"
@@ -204,8 +204,8 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 		return err
 	}
 
-	err = proxyStream.Send(&proxy.ConnOut{
-		Bridge: bridge.NewProxyBridge(s.Bridge),
+	err = proxyStream.Send(&cluster.ConnOut{
+		Bridge: bridge.NewClusterBridge(s.Bridge),
 		Pl:     nil,
 	})
 	if err != nil {
@@ -231,7 +231,7 @@ func (s *Service) handleConnGrpc(c net.Conn) error {
 				return
 			}
 
-			err = proxyStream.Send(&proxy.ConnOut{
+			err = proxyStream.Send(&cluster.ConnOut{
 				Pl: buf[:n],
 			})
 			if err != nil {
@@ -287,7 +287,7 @@ func (s *Service) StartReverseServiceGrpc(chErr chan error) {
 		return
 	}
 
-	err = lcli.Send(&proxy.ConnOut{Bridge: bridge.NewProxyBridge(s.Bridge)})
+	err = lcli.Send(&cluster.ConnOut{Bridge: bridge.NewClusterBridge(s.Bridge)})
 	if err != nil {
 		logrus.Warnf("Error opening remote rev proxy listener conn %s: %s", s.Name(), err.Error())
 		chErr <- err
@@ -326,7 +326,7 @@ func (s *Service) handleDataConnGrpc(id string) {
 		return
 	}
 
-	err = rpw.Send(&proxy.RevProxyConnIn{
+	err = rpw.Send(&cluster.RevProxyConnIn{
 		ConnId: id,
 		Pl:     nil,
 	})
@@ -345,7 +345,7 @@ func (s *Service) handleDataConnGrpc(id string) {
 			c.Close()
 			return
 		}
-		err = rpw.Send(&proxy.RevProxyConnIn{
+		err = rpw.Send(&cluster.RevProxyConnIn{
 			ConnId: id,
 			Pl:     buf[:n],
 		})

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ardanlabs.com/netmux/business/cli/service"
-	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
+	"github.com/ardanlabs.com/netmux/app/services/local/service"
+	"github.com/ardanlabs.com/netmux/business/grpc/local"
 	"github.com/dustin/go-humanize"
 	"github.com/gdamore/tcell/v2"
 	"github.com/hpcloud/tail"
@@ -75,7 +75,7 @@ func renderTable(tb *tview.Table, cfg *service.Netmux) int {
 	return row
 }
 
-func Run(cli agent.AgentClient, funcs map[string]func() error) error {
+func Run(cli local.LocalClient, funcs map[string]func() error) error {
 
 	var buf = &bytes.Buffer{}
 
@@ -93,7 +93,7 @@ func Run(cli agent.AgentClient, funcs map[string]func() error) error {
 		}
 	}()
 
-	stream, err := cli.Monitor(context.Background(), &agent.Noop{})
+	stream, err := cli.Monitor(context.Background(), &local.Noop{})
 	if err != nil {
 		return err
 	}

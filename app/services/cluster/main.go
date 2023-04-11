@@ -9,9 +9,9 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/ardanlabs.com/netmux/app/server/auth"
-	"github.com/ardanlabs.com/netmux/app/server/grpc"
-	"github.com/ardanlabs.com/netmux/app/server/monitor"
+	"github.com/ardanlabs.com/netmux/app/services/cluster/auth"
+	"github.com/ardanlabs.com/netmux/app/services/cluster/grpc"
+	"github.com/ardanlabs.com/netmux/app/services/cluster/monitor"
 	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs/conf/v3"
 	"github.com/sirupsen/logrus"

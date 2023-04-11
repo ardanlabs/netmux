@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ardanlabs.com/netmux/business/cli/service"
+	"github.com/ardanlabs.com/netmux/app/services/local/service"
 	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs.com/netmux/foundation/shell"
 	"github.com/sirupsen/logrus"

@@ -11,9 +11,9 @@ import (
 	"os/user"
 	"time"
 
-	"github.com/ardanlabs.com/netmux/business/cli/service"
-	"github.com/ardanlabs.com/netmux/business/grpc/clients/agent"
-	"github.com/ardanlabs.com/netmux/business/grpc/clients/proxy"
+	"github.com/ardanlabs.com/netmux/app/services/local/service"
+	"github.com/ardanlabs.com/netmux/business/grpc/cluster"
+	"github.com/ardanlabs.com/netmux/business/grpc/local"
 	"github.com/ardanlabs.com/netmux/business/sys/nmconfig"
 	"github.com/ardanlabs.com/netmux/foundation/hosts"
 	"github.com/ardanlabs.com/netmux/foundation/signal"
@@ -43,21 +43,21 @@ func (e *event) PayloadJson() []byte {
 // =============================================================================
 
 type server struct {
-	agent.UnsafeAgentServer
+	local.UnsafeLocalServer
 	signal *signal.Signal[event]
 	hosts  *hosts.Hosts
 }
 
-func (s *server) Load(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) Load(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	_, err := os.Stat(req.Msg)
 	if err != nil {
 		return nil, err
 	}
 	service.Default().Load(req.Msg)
-	return &agent.Noop{}, nil
+	return &local.Noop{}, nil
 }
 
-func (s *server) SetConfig(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) SetConfig(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	logrus.Infof("Loading config from: %s", req.Msg)
 	service.Reset()
 
@@ -74,21 +74,21 @@ func (s *server) SetConfig(ctx context.Context, req *agent.StringMsg) (*agent.No
 		return nil, err
 	}
 
-	return &agent.Noop{}, err
+	return &local.Noop{}, err
 }
 
-func (s *server) GetConfig(ctx context.Context, req *agent.Noop) (*agent.StringMsg, error) {
+func (s *server) GetConfig(ctx context.Context, req *local.Noop) (*local.StringMsg, error) {
 	cfg, err := nmconfig.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	res := &agent.StringMsg{Msg: cfg.FileName()}
+	res := &local.StringMsg{Msg: cfg.FileName()}
 
 	return res, nil
 }
 
-func (s *server) Connect(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) Connect(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 
 	if nxctx == nil {
@@ -124,7 +124,7 @@ func (s *server) Connect(ctx context.Context, req *agent.StringMsg) (*agent.Noop
 		return nil, fmt.Errorf("timeout connecting to context: %s", req.Msg)
 	}
 
-	ka, err := nxctx.Cli().KeepAlive(context.Background(), &proxy.Noop{})
+	ka, err := nxctx.Cli().KeepAlive(context.Background(), &cluster.Noop{})
 	if err != nil {
 		return nil, err
 	}
@@ -167,10 +167,10 @@ func (s *server) Connect(ctx context.Context, req *agent.StringMsg) (*agent.Noop
 		Payload: "connected at: " + time.Now().String(),
 	})
 
-	return &agent.Noop{}, err
+	return &local.Noop{}, err
 }
 
-func (s *server) Disconnect(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) Disconnect(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -178,28 +178,28 @@ func (s *server) Disconnect(ctx context.Context, req *agent.StringMsg) (*agent.N
 	nxctx.Stop()
 	nxctx.Services = make([]*service.Service, 0)
 
-	return &agent.Noop{}, nil
+	return &local.Noop{}, nil
 }
 
-func (s *server) ClusterInstall(ctx context.Context, req *agent.ClusterInstallReq) (*agent.Noop, error) {
+func (s *server) ClusterInstall(ctx context.Context, req *local.ClusterInstallReq) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Nxctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
 	err := service.DefaultK8sController().SetupDeploy(ctx, nxctx, req.Ns, req.Kctx, req.Arch)
-	return &agent.Noop{}, err
+	return &local.Noop{}, err
 }
 
-func (s *server) ClusterUninstall(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) ClusterUninstall(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
 	}
 	err := service.DefaultK8sController().TearDownDeploy(ctx, nxctx)
-	return &agent.Noop{}, err
+	return &local.Noop{}, err
 }
 
-func (s *server) PfOn(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) PfOn(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -208,10 +208,10 @@ func (s *server) PfOn(ctx context.Context, req *agent.StringMsg) (*agent.Noop, e
 		return nil, fmt.Errorf("context has no port forward")
 	}
 	err := nxctx.StartPortForwarding()
-	return &agent.Noop{}, err
+	return &local.Noop{}, err
 }
 
-func (s *server) PfOff(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) PfOff(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found")
@@ -220,10 +220,10 @@ func (s *server) PfOff(ctx context.Context, req *agent.StringMsg) (*agent.Noop, 
 		return nil, fmt.Errorf("context has no port forward")
 	}
 	err := nxctx.StopPortForwarding()
-	return &agent.Noop{}, err
+	return &local.Noop{}, err
 }
 
-func (s *server) Login(ctx context.Context, req *agent.LoginMessage) (*agent.StringMsg, error) {
+func (s *server) Login(ctx context.Context, req *local.LoginMessage) (*local.StringMsg, error) {
 	nxctx := service.Default().CtxByName(req.Context)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Context)
@@ -243,10 +243,10 @@ func (s *server) Login(ctx context.Context, req *agent.LoginMessage) (*agent.Str
 		return nil, err
 	}
 
-	return &agent.StringMsg{Msg: "ok"}, nil
+	return &local.StringMsg{Msg: "ok"}, nil
 }
 
-func (s *server) Logout(ctx context.Context, req *agent.StringMsg) (*agent.Noop, error) {
+func (s *server) Logout(ctx context.Context, req *local.StringMsg) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Msg)
 	if nxctx == nil {
 		return nil, fmt.Errorf("context not found: %s", req.Msg)
@@ -265,15 +265,15 @@ func (s *server) Logout(ctx context.Context, req *agent.StringMsg) (*agent.Noop,
 		return nil, err
 	}
 
-	return &agent.Noop{}, nil
+	return &local.Noop{}, nil
 }
 
-func (s *server) ResetHosts(ctx context.Context, req *agent.Noop) (*agent.Noop, error) {
+func (s *server) ResetHosts(ctx context.Context, req *local.Noop) (*local.Noop, error) {
 	s.hosts.Remove("nx: ctx")
-	return &agent.Noop{}, nil
+	return &local.Noop{}, nil
 }
 
-func (s *server) StartSvc(ctx context.Context, req *agent.SvcRequest) (*agent.Noop, error) {
+func (s *server) StartSvc(ctx context.Context, req *local.SvcRequest) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
@@ -295,10 +295,10 @@ func (s *server) StartSvc(ctx context.Context, req *agent.SvcRequest) (*agent.No
 		time.Sleep(time.Second)
 	}
 
-	return &agent.Noop{}, nil
+	return &local.Noop{}, nil
 }
 
-func (s *server) StopSvc(ctx context.Context, req *agent.SvcRequest) (*agent.Noop, error) {
+func (s *server) StopSvc(ctx context.Context, req *local.SvcRequest) (*local.Noop, error) {
 	nxctx := service.Default().CtxByName(req.Ctx)
 	if nxctx == nil {
 		return nil, fmt.Errorf("ctx %s not found", req.Ctx)
@@ -314,18 +314,18 @@ func (s *server) StopSvc(ctx context.Context, req *agent.SvcRequest) (*agent.Noo
 			logrus.Warnf("Error stopping service: %s", err.Error())
 		}
 	}
-	return &agent.Noop{}, nil
+	return &local.Noop{}, nil
 }
 
-func (s *server) Exit(ctx context.Context, req *agent.Noop) (*agent.Noop, error) {
+func (s *server) Exit(ctx context.Context, req *local.Noop) (*local.Noop, error) {
 	os.Exit(0)
 	return nil, nil
 }
 
-func (s *server) Monitor(req *agent.Noop, res agent.Agent_MonitorServer) error {
+func (s *server) Monitor(req *local.Noop, res local.Local_MonitorServer) error {
 	for {
 		bs, _ := json.Marshal(service.Default())
-		err := res.Send(&agent.StringMsg{Msg: string(bs)})
+		err := res.Send(&local.StringMsg{Msg: string(bs)})
 		if err != nil {
 			return err
 		}
@@ -333,7 +333,7 @@ func (s *server) Monitor(req *agent.Noop, res agent.Agent_MonitorServer) error {
 	}
 }
 
-func (s *server) Events(req *agent.Noop, res agent.Agent_EventsServer) error {
+func (s *server) Events(req *local.Noop, res local.Local_EventsServer) error {
 	chn := s.signal.Aquire()
 
 	for {
@@ -342,7 +342,7 @@ func (s *server) Events(req *agent.Noop, res agent.Agent_EventsServer) error {
 			return nil
 		}
 
-		res.Send(&agent.EventMsg{
+		res.Send(&local.EventMsg{
 			Msg:     evt.PayloadJson(),
 			Ctx:     evt.Ctx,
 			MsgType: string(evt.Type),
@@ -350,8 +350,8 @@ func (s *server) Events(req *agent.Noop, res agent.Agent_EventsServer) error {
 	}
 }
 
-func buildStatus(resetCounters bool) (*agent.StatusResponse, error) {
-	var ret = agent.StatusResponse{}
+func buildStatus(resetCounters bool) (*local.StatusResponse, error) {
+	var ret = local.StatusResponse{}
 
 	cfg, err := nmconfig.Load()
 	if err != nil {
@@ -363,7 +363,7 @@ func buildStatus(resetCounters bool) (*agent.StatusResponse, error) {
 
 	for i := range service.Default().Contexts {
 		actx := service.Default().Contexts[i]
-		ctx := &agent.ContextStatusResponse{}
+		ctx := &local.ContextStatusResponse{}
 		ctx.Name = actx.Name
 		ctx.Status = string(actx.Status)
 		ctx.Pfstatus = string(actx.PortForwardStatus)
@@ -371,7 +371,7 @@ func buildStatus(resetCounters bool) (*agent.StatusResponse, error) {
 		for j := range actx.Services {
 			asvc := actx.Services[j]
 			if asvc.Bridge.IsZero() {
-				svc := &agent.ServiceStatusResponse{
+				svc := &local.ServiceStatusResponse{
 					Name:       asvc.Name(),
 					Localaddr:  asvc.Bridge.LocalHost,
 					Localport:  asvc.Bridge.LocalPort,
@@ -399,7 +399,7 @@ func buildStatus(resetCounters bool) (*agent.StatusResponse, error) {
 	return &ret, nil
 }
 
-func (s *server) Status(_ context.Context, req *agent.StringMsg) (*agent.StatusResponse, error) {
+func (s *server) Status(_ context.Context, req *local.StringMsg) (*local.StatusResponse, error) {
 	res, err := buildStatus(req.Msg == "zero")
 	if err != nil {
 		return nil, err
@@ -408,7 +408,7 @@ func (s *server) Status(_ context.Context, req *agent.StringMsg) (*agent.StatusR
 	return res, nil
 
 }
-func (s *server) Ping(ctx context.Context, req *agent.StringMsg) (*agent.StringMsg, error) {
+func (s *server) Ping(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
@@ -422,7 +422,7 @@ func (s *server) Ping(ctx context.Context, req *agent.StringMsg) (*agent.StringM
 		err := fmt.Errorf("context %s not connected to server", nxctx.Name)
 		return nil, err
 	}
-	res, err := nxctx.Cli().Ping(ctx, &proxy.StringMsg{
+	res, err := nxctx.Cli().Ping(ctx, &cluster.StringMsg{
 		Msg: req.Msg,
 	})
 
@@ -430,9 +430,9 @@ func (s *server) Ping(ctx context.Context, req *agent.StringMsg) (*agent.StringM
 		return nil, err
 	}
 
-	return &agent.StringMsg{Msg: res.Msg}, nil
+	return &local.StringMsg{Msg: res.Msg}, nil
 }
-func (s *server) PortScan(ctx context.Context, req *agent.StringMsg) (*agent.StringMsg, error) {
+func (s *server) PortScan(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
@@ -446,7 +446,7 @@ func (s *server) PortScan(ctx context.Context, req *agent.StringMsg) (*agent.Str
 		err := fmt.Errorf("context %s not connected to server", nxctx.Name)
 		return nil, err
 	}
-	res, err := nxctx.Cli().PortScan(ctx, &proxy.StringMsg{
+	res, err := nxctx.Cli().PortScan(ctx, &cluster.StringMsg{
 		Msg: req.Msg,
 	})
 
@@ -454,9 +454,9 @@ func (s *server) PortScan(ctx context.Context, req *agent.StringMsg) (*agent.Str
 		return nil, err
 	}
 
-	return &agent.StringMsg{Msg: res.Msg}, nil
+	return &local.StringMsg{Msg: res.Msg}, nil
 }
-func (s *server) SpeedTest(ctx context.Context, req *agent.StringMsg) (*agent.StringMsg, error) {
+func (s *server) SpeedTest(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
 	nxctx := service.Default().CtxByName(*req.Ctx)
 
 	if nxctx == nil {
@@ -467,7 +467,7 @@ func (s *server) SpeedTest(ctx context.Context, req *agent.StringMsg) (*agent.St
 		return nil, err
 	}
 	start := time.Now()
-	res, err := nxctx.Cli().SpeedTest(ctx, &proxy.StringMsg{
+	res, err := nxctx.Cli().SpeedTest(ctx, &cluster.StringMsg{
 		Msg: req.Msg,
 	})
 	dur := time.Since(start)
@@ -475,23 +475,23 @@ func (s *server) SpeedTest(ctx context.Context, req *agent.StringMsg) (*agent.St
 		return nil, err
 	}
 
-	return &agent.StringMsg{Msg: fmt.Sprintf("Got payload from ctx %s. Total time: %s. Pl Size: %s / %v",
+	return &local.StringMsg{Msg: fmt.Sprintf("Got payload from ctx %s. Total time: %s. Pl Size: %s / %v",
 		*req.Ctx,
 		dur.String(),
 		req.String(),
 		len(res.Msg),
 	)}, nil
 }
-func (s *server) Config(context.Context, *agent.Noop) (*agent.BytesMsg, error) {
+func (s *server) Config(context.Context, *local.Noop) (*local.BytesMsg, error) {
 	bs, err := json.Marshal(service.Default())
 	if err != nil {
 		return nil, err
 	}
-	ret := &agent.BytesMsg{Msg: bs}
+	ret := &local.BytesMsg{Msg: bs}
 	return ret, nil
 }
 
-func (s *server) Nc(ctx context.Context, req *agent.StringMsg) (*agent.StringMsg, error) {
+func (s *server) Nc(ctx context.Context, req *local.StringMsg) (*local.StringMsg, error) {
 	if req.Ctx == nil {
 		return nil, fmt.Errorf("no ctx provided")
 	}
@@ -505,7 +505,7 @@ func (s *server) Nc(ctx context.Context, req *agent.StringMsg) (*agent.StringMsg
 		err := fmt.Errorf("context %s not connected to server", nxctx.Name)
 		return nil, err
 	}
-	res, err := nxctx.Cli().Nc(ctx, &proxy.StringMsg{
+	res, err := nxctx.Cli().Nc(ctx, &cluster.StringMsg{
 		Msg: req.Msg,
 	})
 
@@ -513,7 +513,7 @@ func (s *server) Nc(ctx context.Context, req *agent.StringMsg) (*agent.StringMsg
 		return nil, err
 	}
 
-	return &agent.StringMsg{Msg: res.Msg}, nil
+	return &local.StringMsg{Msg: res.Msg}, nil
 }
 
 func Run(actuser *user.User) error {
@@ -585,7 +585,7 @@ func Run(actuser *user.User) error {
 	defer srv.signal.Shutdown()
 
 	grpcServer := grpc.NewServer()
-	agent.RegisterAgentServer(grpcServer, &srv)
+	local.RegisterLocalServer(grpcServer, &srv)
 
 	return grpcServer.Serve(l)
 }

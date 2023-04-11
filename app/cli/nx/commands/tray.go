@@ -3,7 +3,7 @@ package commands
 import (
 	"os"
 
-	"github.com/ardanlabs.com/netmux/business/cli/installer"
+	"github.com/ardanlabs.com/netmux/app/cli/installer"
 	"github.com/ardanlabs.com/netmux/foundation/shell"
 )
 
